@@ -25,17 +25,17 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与 R8 稳定性手术
+      - name: 修复闪退与 R8 崩溃手术
         run: |
           # 1. 移除签名配置
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 核心修改：关闭 shrinkResources 以修复 IndexOutOfBoundsException
+          # 2. 核心修改：关闭 shrinkResources (防止 IndexOutOfBounds 崩溃)
           # 强制关闭 debuggable 并开启混淆
           sed -i '/buildTypes {/a \        all { \n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入“稳定版”混淆规则，修复 R8 崩溃
+          # 3. 写入稳定版混淆规则
           cat <<EOF > app/proguard-rules.pro
           # 关闭激进优化，防止 R8 内部索引报错
           -dontoptimize
@@ -45,9 +45,11 @@ jobs:
           -keep class com.chaquo.python.** { *; }
           -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           
-          # 修复投屏服务崩溃 (DLNA)
+          # 必须保留：投屏服务与核心业务逻辑 (防止 image.png 中的 class te1 报错)
           -keep class com.fongmi.android.tv.** { *; }
           -keep interface com.fongmi.android.tv.** { *; }
+          
+          # 修复反射构造报错
           -keepclassmembers class * {
               public <init>(java.lang.String);
           }
@@ -61,7 +63,7 @@ jobs:
           -ignorewarnings
           EOF
           
-          # 4. 校准环境
+          # 4. 配置环境路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -69,12 +71,12 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 执行强力构建 (修复版)
+      - name: 强力构建
         run: ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_R8_Fixed_Build
+          name: TVBox_Fixed_Stable_Build
           path: app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
