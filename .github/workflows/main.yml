@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
-# 解决 Node.js 20 弃用警告，强制使用 Node.js 24
+# 强制使用 Node.js 24 以消除弃用警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -22,19 +22,18 @@ jobs:
           cache: gradle
 
       - name: 安装 Python 3.10
-        # Chaquopy 插件编译环境必需
+        # Chaquopy 编译环境必需
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与代码手术 (极致压缩 DEX)
+      - name: 环境预处理与代码手术 (极致压缩与混淆)
         run: |
           # 1. 物理移除签名配置，彻底解决 null 报错
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
           # 2. 启用 MultiDex 并强制开启 R8 全量压缩与混淆
-          # 即使压缩，项目包含 Python 环境仍需支持分包以确保成功
           sed -i 's/multiDexEnabled false/multiDexEnabled true/g' app/build.gradle
           
           # 3. 注入混淆与资源压缩配置，减少方法数以缩减 DEX 数量
@@ -42,19 +41,13 @@ jobs:
           
           # 4. 写入保护规则，确保混淆后核心功能不闪退
           cat <<EOF > app/proguard-rules.pro
-          # 深度优化
           -optimizationpasses 5
           -allowaccessmodification
-          
-          # 保留 Chaquopy Python 相关接口
           -keep class com.chaquo.python.** { *; }
           -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
-          
-          # 保留 TVBox 数据模型和 JS 桥接，防止解析失败
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
-          
-          # 忽略第三方库警告
+          -keepclasseswithmembernames class * { native <methods>; }
           -dontnote **
           -dontwarn **
           -ignorewarnings
@@ -69,13 +62,17 @@ jobs:
         run: chmod +x gradlew
 
       - name: 强力构建
-        # 编译 Debug 变体，由于开启了混淆，产物将非常精简
+        # 编译所有 debug 变体
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: 上传精简版 APK
+      - name: 整理并上传多个独立 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Optimized_Build
-          # 递归搜索所有变体子目录下的 APK
-          path: app/build/outputs/apk/**/debug/*.apk
+          name: TVBox_Individual_APKs
+          # 关键：path 指向所有生成的 APK 文件
+          # upload-artifact v4 会将匹配到的多个文件列出
+          path: |
+            app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
+          # 设置不自动压缩（虽然 v4 默认行为有所改变，但这样能确保文件结构清晰）
+          compression-level: 0
