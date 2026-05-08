@@ -25,33 +25,27 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与代码手术 (极致压缩与混淆)
+      - name: 生产环境极限优化手术
         run: |
-          # 1. 物理移除签名配置
+          # 1. 彻底移除签名配置，虽然是生产环境，但我们仍使用调试签名以防报错
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 启用 MultiDex 并开启 R8 混淆
-          sed -i 's/multiDexEnabled false/multiDexEnabled true/g' app/build.gradle
+          # 2. 修改 release 配置，开启极限压缩
+          # 强制将所有变体的 release 模式开启 minifyEnabled 和 shrinkResources
+          sed -i '/release {/a \            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"' app/build.gradle
           
-          # 3. 注入混淆与资源压缩配置
-          sed -i '/debug {/a \            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"' app/build.gradle
-          
-          # 4. 写入保护规则
+          # 3. 写入关键保护规则 (防止混淆导致 Python 或数据模型崩溃)
           cat <<EOF > app/proguard-rules.pro
           -optimizationpasses 5
-          -allowaccessmodification
           -keep class com.chaquo.python.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
-          -keepclasseswithmembernames class * { native <methods>; }
-          -dontnote **
-          -dontwarn **
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
           -ignorewarnings
           EOF
           
-          # 5. 配置环境
+          # 4. 环境路径配置
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -59,19 +53,13 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建
-        run: ./gradlew assembleDebug --no-daemon
+      - name: 执行生产环境编译
+        # 使用 assembleRelease 编译生产版本
+        run: ./gradlew assembleRelease --no-daemon
 
-      # 关键修改：将文件移动到一个平级目录，并分别上传
-      - name: 整理 APK 文件
-        run: |
-          mkdir -p final_apks
-          # 寻找所有生成的 apk 并复制到根目录，重命名以区分变体
-          find app/build/outputs/apk/ -name "*.apk" -exec cp {} final_apks/ \;
-
-      - name: 独立上传每个 APK
+      - name: 提取并独立上传每个 APK
+        # 这个步骤会将每个生成的 APK 以独立文件形式上传
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_APKs
-          path: final_apks/*.apk
-          if-no-files-found: error
+          name: TVBox_Release_Final
+          path: app/build/outputs/apk/**/release/*.apk
