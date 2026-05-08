@@ -25,47 +25,37 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与强制全量混淆手术
+      - name: 环境预处理与强制混淆手术
         run: |
-          # 1. 彻底移除签名配置
+          # 1. 移除签名配置
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 全局劫持：强制所有变体开启极致混淆
-          # 必须使用 proguardFiles 的 optimize 版本来获得最高强度的类名粉碎
-          sed -i '/buildTypes {/a \        all { \n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
+          # 2. 核心修改：强制关闭 debuggable 并开启极致优化
+          # [span_8](start_span)[span_9](start_span)这会消除日志中的 WARNING，强制 R8 执行混淆[span_8](end_span)[span_9](end_span)
+          sed -i '/buildTypes {/a \        all { \n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入“粉碎级”混淆规则
+          # 3. 写入混淆规则
           cat <<EOF > app/proguard-rules.pro
-          # 显式要求开启混淆
-          -obfuscationdictionary
-          -classobfuscationdictionary
-          -packageobfuscationdictionary
-          
-          # 极致优化设置
+          # 允许混淆和优化
           -optimizationpasses 5
           -allowaccessmodification
-          -overloadaggressively
-          -repackageclasses ''
           
-          # 【核心：删掉这一行或确保没有 -dontobfuscate】
-          # 如果之前有 -dontobfuscate，现在必须消失
-          
-          # 必须保留的：Chaquopy Python 环境
+          # 必须保留 Python 接口 (Chaquopy)
           -keep class com.chaquo.python.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
           
-          # 必须保留的：TVBox 核心数据模型
+          # 保留数据模型，防止解析失效
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
           
-          # 剩下的：androidx, okhttp, rtmp 等全部会被粉碎成 a, b, c
+          # 忽略第三方库警告
           -dontnote **
           -dontwarn **
           -ignorewarnings
           EOF
           
-          # 4. 校准环境路径
+          # 4. 校准环境
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -79,6 +69,6 @@ jobs:
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Full_Obfuscated_Build
+          name: TVBox_Final_Mixed_Build
           path: app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
