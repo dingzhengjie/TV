@@ -3,7 +3,6 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
-# 解决 Node.js 20 弃用警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -26,31 +25,61 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与代码手术
+      - name: 生产环境稳定性修复手术
         run: |
-          # 1. 物理移除签名配置 (解决 null 报错)[span_3](start_span)[span_3](end_span)
+          # 1. 物理移除签名配置，解决 null 报错
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 指定 Chaquopy 的 Python 路径[span_4](start_span)[span_4](end_span)
+          # 2. 注入生产环境配置：开启极致压缩，但关闭不稳定的资源缩减 (防止 IndexOutOfBounds 崩溃)
+          # 强制设置 debuggable false 确保混淆生效
+          sed -i '/release {/,/}/c\        release {\n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
+          
+          # 3. 写入“最强兼容”混淆规则 (解决闪退的核心)
+          cat <<EOF > app/proguard-rules.pro
+          # 基础：关闭激进优化，保证老旧电视硬件兼容
+          -dontoptimize
+          -dontpreverify
+          -ignorewarnings
+          
+          # 核心保护：Chaquopy Python 环境 (防止 Python 逻辑崩溃)
+          -keep class com.chaquo.python.** { *; }
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
+          
+          # 核心保护：修复投屏 (DLNA) 和核心业务闪退
+          # 保护 com.fongmi 等包下的所有类名不被修改
+          -keep class com.fongmi.android.tv.** { *; }
+          -keep interface com.fongmi.android.tv.** { *; }
+          
+          # 修复反射构造报错 (解决 class te1 这种找不到构造函数的闪退)
+          -keepclassmembers class * {
+              public <init>(java.lang.String);
+              public <init>(android.content.Context, android.util.AttributeSet);
+          }
+          
+          # 核心保护：TVBox 数据模型与 JS 桥接 (防止解析视频源闪退)
+          -keep class com.github.tvbox.osc.bean.** { *; }
+          -keep class com.github.tvbox.osc.util.js.** { *; }
+          
+          # 忽略第三方库的琐碎警告
+          -dontnote **
+          -dontwarn **
+          EOF
+          
+          # 4. 补齐 SDK 与环境配置文件
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
-          
-          # 3. 补齐 SDK 配置文件
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT" >> local.properties
 
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建
-        # 编译所有 debug 变体
-        run: ./gradlew assembleDebug --no-daemon
+      - name: 强力构建生产版本
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Build_Result
-          # 关键修改：使用通配符匹配所有可能的变体子目录
-          path: app/build/outputs/apk/**/debug/*.apk
-          # 如果没找到文件，让 Workflow 报错而不是静默失败
+          name: TVBox_Final_Stable_Release
+          path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
