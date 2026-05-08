@@ -3,7 +3,6 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
-# 解决 Node.js 20 弃用警告，强制使用 Node.js 24
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -22,42 +21,42 @@ jobs:
           cache: gradle
 
       - name: 安装 Python 3.10
-        # Chaquopy 编译必须指定 3.10 版本
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与精简手术
+      - name: 环境预处理与强制混淆手术
         run: |
-          # 1. 物理移除所有签名配置 (核心：解决之前的 null 报错和签名冲突)
+          # 1. 彻底移除签名配置，防止构建中断
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 注入混淆配置到 Debug 模式 (核心：在 Debug 任务中强制压缩 DEX)
-          # 开启 minifyEnabled 来剔除无用代码，这是减少 DEX 数量的唯一办法
-          sed -i '/debug {/a \            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"' app/build.gradle
+          # 2. 强力注入：直接在 buildTypes 块之后强制开启全局混淆与压缩
+          # 这样可以确保不论是 debug 还是 release，都会执行 R8 剔除
+          sed -i '/buildTypes {/a \        all { \n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入针对 Chaquopy 和 TVBox 的专用 Proguard 规则
-          # 既要合并 DEX，又要保证 Python 脚本不崩溃
+          # 3. 写入极限混淆规则：除了 Python 环境，其他全部混淆
           cat <<EOF > app/proguard-rules.pro
-          # 基础设置：不混淆类名，但允许压缩 (解决 30 多个 DEX 的问题)
-          -dontobfuscate
-          -dontoptimize
-          -ignorewarnings
+          # 开启四级优化
+          -optimizationpasses 4
+          -allowaccessmodification
+          -overloadaggressively
           
-          # 保留 Python 环境核心接口
+          # 必须保留：Chaquopy Python 环境 (否则脚本必崩)
           -keep class com.chaquo.python.** { *; }
           -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
           
-          # 保留 TVBox 关键 Bean 和 JS 桥接，确保解析正常
+          # 必须保留：数据模型和 JS 接口 (防止 JSON 解析失败)
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
           
+          # 剩下的全混淆：包括你图片里的 androidx, okhttp, rtmp_client 等
           -dontnote **
           -dontwarn **
+          -ignorewarnings
           EOF
           
-          # 4. 校准环境路径 (修复 1.txt 中的 Python 找不到报错)
+          # 4. 校准环境路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -65,14 +64,13 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建
-        # 使用 assembleDebug 任务，但在预处理中我们已经注入了压缩逻辑
+      - name: 强力构建 (多 DEX 合并版)
+        # 使用 assembleDebug 触发我们刚刚注入的全局压缩逻辑
         run: ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Optimized_Build
-          # 匹配所有编译出的变体 APK
+          name: TVBox_Compressed_Build
           path: app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
