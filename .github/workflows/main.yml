@@ -3,6 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
+# 解决 Node.js 20 弃用警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -25,37 +26,48 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与强制混淆手术
+      - name: 环境预处理与强制全量混淆手术
         run: |
-          # 1. 移除签名配置
+          # 1. 物理移除签名配置，防止 release 模式强制校验签名失败
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 核心修改：强制关闭 debuggable 并开启极致优化
-          # [span_8](start_span)[span_9](start_span)这会消除日志中的 WARNING，强制 R8 执行混淆[span_8](end_span)[span_9](end_span)
-          sed -i '/buildTypes {/a \        all { \n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
+          # 2. 核心劫持：强制所有变体关闭 debuggable 并开启极致优化
+          # 这会强制 R8 执行类名混淆，并将 30 多个 DEX 压缩到个位数
+          sed -i '/buildTypes {/a \        all { \n            debuggable false\n            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入混淆规则
+          # 3. 写入“防闪退”级混淆规则
           cat <<EOF > app/proguard-rules.pro
-          # 允许混淆和优化
+          # 极致优化与混淆设置
           -optimizationpasses 5
           -allowaccessmodification
+          -overloadaggressively
           
-          # 必须保留 Python 接口 (Chaquopy)
+          # 解决 1.txt 报错：必须保留 Chaquopy (Python) 核心
           -keep class com.chaquo.python.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           
-          # 保留数据模型，防止解析失效
+          # 解决投屏闪退：保护 DLNA 服务及其相关类名
+          # 报错中提到的 class te1 通常属于以下包，必须保留类名以供系统反射调用
+          -keep class com.fongmi.android.tv.** { *; }
+          -keep interface com.fongmi.android.tv.** { *; }
+          
+          # 修复反射构造报错：强制保留所有单字符串参数的构造函数
+          -keepclassmembers class * {
+              public <init>(java.lang.String);
+          }
+          
+          # 保留 TVBox 核心 Bean 和 JS 接口，确保视频源解析正常
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
           
-          # 忽略第三方库警告
+          # 剩下的：androidx, okhttp, rtmp 等全量粉碎为 a, b, c
           -dontnote **
           -dontwarn **
           -ignorewarnings
           EOF
           
-          # 4. 校准环境
+          # 4. 配置环境路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -63,12 +75,13 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建
+      - name: 执行强力构建
+        # 运行 assembleDebug。因注入了 debuggable false，它将执行生产级别的混淆
         run: ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Final_Mixed_Build
+          name: TVBox_Final_Compressed_Build
           path: app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
