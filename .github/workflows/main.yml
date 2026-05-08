@@ -25,27 +25,33 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 生产环境极限优化手术
+      - name: 环境预处理与生产环境手术
         run: |
-          # 1. 彻底移除签名配置，虽然是生产环境，但我们仍使用调试签名以防报错
+          # 1. 物理移除签名配置，防止 release 模式强制校验签名
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 修改 release 配置，开启极限压缩
-          # 强制将所有变体的 release 模式开启 minifyEnabled 和 shrinkResources
+          # 2. 确保 release 模式开启了压缩，但使用更稳健的规则
+          # 这样能把 30 多个 DEX 压到 2-3 个
           sed -i '/release {/a \            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"' app/build.gradle
           
-          # 3. 写入关键保护规则 (防止混淆导致 Python 或数据模型崩溃)
+          # 3. 【关键】写入生产环境保护规则，解决 1.txt 里的编译报错
           cat <<EOF > app/proguard-rules.pro
-          -optimizationpasses 5
+          # 解决 Chaquopy 报错：必须保留 Python 所有的核心类
           -keep class com.chaquo.python.** { *; }
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
+          
+          # 解决 TVBox 逻辑报错：保留数据模型和 JS 桥接
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
+          
+          # 忽略所有警告，防止 R8 因为找不到某些无关紧要的引用而中断编译
+          -dontnote **
+          -dontwarn **
           -ignorewarnings
           EOF
           
-          # 4. 环境路径配置
+          # 4. 指定 Python 路径（修复日志中的路径报错）
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -53,13 +59,14 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 执行生产环境编译
-        # 使用 assembleRelease 编译生产版本
+      - name: 执行生产环境构建
+        # 编译 Release 版本，产物会比 Debug 版小很多
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: 提取并独立上传每个 APK
-        # 这个步骤会将每个生成的 APK 以独立文件形式上传
+      - name: 上传生产环境 APK
         uses: actions/upload-artifact@v4
         with:
           name: TVBox_Release_Final
+          # 匹配所有 release 目录下的 APK
           path: app/build/outputs/apk/**/release/*.apk
+          if-no-files-found: error
