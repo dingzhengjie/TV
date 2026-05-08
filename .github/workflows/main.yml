@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
-# 解决 Node.js 20 弃用警告
+# 解决 Node.js 20 弃用警告，强制使用 Node.js 24
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -22,35 +22,60 @@ jobs:
           cache: gradle
 
       - name: 安装 Python 3.10
+        # Chaquopy 插件编译环境必需
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与代码手术
+      - name: 环境预处理与代码手术 (极致压缩 DEX)
         run: |
-          # 1. 物理移除签名配置 (解决 null 报错)[span_3](start_span)[span_3](end_span)
+          # 1. 物理移除签名配置，彻底解决 null 报错
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 指定 Chaquopy 的 Python 路径[span_4](start_span)[span_4](end_span)
+          # 2. 启用 MultiDex 并强制开启 R8 全量压缩与混淆
+          # 即使压缩，项目包含 Python 环境仍需支持分包以确保成功
+          sed -i 's/multiDexEnabled false/multiDexEnabled true/g' app/build.gradle
+          
+          # 3. 注入混淆与资源压缩配置，减少方法数以缩减 DEX 数量
+          sed -i '/debug {/a \            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"' app/build.gradle
+          
+          # 4. 写入保护规则，确保混淆后核心功能不闪退
+          cat <<EOF > app/proguard-rules.pro
+          # 深度优化
+          -optimizationpasses 5
+          -allowaccessmodification
+          
+          # 保留 Chaquopy Python 相关接口
+          -keep class com.chaquo.python.** { *; }
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
+          
+          # 保留 TVBox 数据模型和 JS 桥接，防止解析失败
+          -keep class com.github.tvbox.osc.bean.** { *; }
+          -keep class com.github.tvbox.osc.util.js.** { *; }
+          
+          # 忽略第三方库警告
+          -dontnote **
+          -dontwarn **
+          -ignorewarnings
+          EOF
+          
+          # 5. 指定 Python 路径和 SDK 路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
-          
-          # 3. 补齐 SDK 配置文件
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       - name: 赋予执行权限
         run: chmod +x gradlew
 
       - name: 强力构建
-        # 编译所有 debug 变体
+        # 编译 Debug 变体，由于开启了混淆，产物将非常精简
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: 上传 APK
+      - name: 上传精简版 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Build_Result
-          # 关键修改：使用通配符匹配所有可能的变体子目录
+          name: TVBox_Optimized_Build
+          # 递归搜索所有变体子目录下的 APK
           path: app/build/outputs/apk/**/debug/*.apk
-          # 如果没找到文件，让 Workflow 报错而不是静默失败
           if-no-files-found: error
