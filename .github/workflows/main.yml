@@ -25,32 +25,41 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 环境预处理与强制混淆手术
+      - name: 环境预处理与强制全量混淆手术
         run: |
-          # 1. 彻底移除签名配置，防止构建中断
+          # 1. 彻底移除签名配置
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 强力注入：直接在 buildTypes 块之后强制开启全局混淆与压缩
-          # 这样可以确保不论是 debug 还是 release，都会执行 R8 剔除
+          # 2. 全局劫持：强制所有变体开启极致混淆
+          # 必须使用 proguardFiles 的 optimize 版本来获得最高强度的类名粉碎
           sed -i '/buildTypes {/a \        all { \n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入极限混淆规则：除了 Python 环境，其他全部混淆
+          # 3. 写入“粉碎级”混淆规则
           cat <<EOF > app/proguard-rules.pro
-          # 开启四级优化
-          -optimizationpasses 4
+          # 显式要求开启混淆
+          -obfuscationdictionary
+          -classobfuscationdictionary
+          -packageobfuscationdictionary
+          
+          # 极致优化设置
+          -optimizationpasses 5
           -allowaccessmodification
           -overloadaggressively
+          -repackageclasses ''
           
-          # 必须保留：Chaquopy Python 环境 (否则脚本必崩)
+          # 【核心：删掉这一行或确保没有 -dontobfuscate】
+          # 如果之前有 -dontobfuscate，现在必须消失
+          
+          # 必须保留的：Chaquopy Python 环境
           -keep class com.chaquo.python.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           
-          # 必须保留：数据模型和 JS 接口 (防止 JSON 解析失败)
+          # 必须保留的：TVBox 核心数据模型
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
           
-          # 剩下的全混淆：包括你图片里的 androidx, okhttp, rtmp_client 等
+          # 剩下的：androidx, okhttp, rtmp 等全部会被粉碎成 a, b, c
           -dontnote **
           -dontwarn **
           -ignorewarnings
@@ -64,13 +73,12 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建 (多 DEX 合并版)
-        # 使用 assembleDebug 触发我们刚刚注入的全局压缩逻辑
+      - name: 强力构建
         run: ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Compressed_Build
+          name: TVBox_Full_Obfuscated_Build
           path: app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
