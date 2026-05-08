@@ -25,45 +25,38 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 修复闪退与 R8 崩溃手术
+      - name: 环境预处理与强制混淆手术
         run: |
-          # 1. 移除签名配置
+          # 1. 彻底移除签名配置，防止构建中断
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 核心修改：关闭 shrinkResources (防止 IndexOutOfBounds 崩溃)
-          # 强制关闭 debuggable 并开启混淆
-          sed -i '/buildTypes {/a \        all { \n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
+          # 2. 强力注入：直接在 buildTypes 块之后强制开启全局混淆与压缩
+          # 这样可以确保不论是 debug 还是 release，都会执行 R8 剔除
+          sed -i '/buildTypes {/a \        all { \n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入稳定版混淆规则
+          # 3. 写入极限混淆规则：除了 Python 环境，其他全部混淆
           cat <<EOF > app/proguard-rules.pro
-          # 关闭激进优化，防止 R8 内部索引报错
-          -dontoptimize
-          -dontpreverify
+          # 开启四级优化
+          -optimizationpasses 4
+          -allowaccessmodification
+          -overloadaggressively
           
-          # 必须保留 Python 接口 (Chaquopy)
+          # 必须保留：Chaquopy Python 环境 (否则脚本必崩)
           -keep class com.chaquo.python.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature
           
-          # 必须保留：投屏服务与核心业务逻辑 (防止 image.png 中的 class te1 报错)
-          -keep class com.fongmi.android.tv.** { *; }
-          -keep interface com.fongmi.android.tv.** { *; }
-          
-          # 修复反射构造报错
-          -keepclassmembers class * {
-              public <init>(java.lang.String);
-          }
-          
-          # 保留 TVBox 数据模型
+          # 必须保留：数据模型和 JS 接口 (防止 JSON 解析失败)
           -keep class com.github.tvbox.osc.bean.** { *; }
           -keep class com.github.tvbox.osc.util.js.** { *; }
           
+          # 剩下的全混淆：包括你图片里的 androidx, okhttp, rtmp_client 等
           -dontnote **
           -dontwarn **
           -ignorewarnings
           EOF
           
-          # 4. 配置环境路径
+          # 4. 校准环境路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
@@ -71,12 +64,13 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建
+      - name: 强力构建 (多 DEX 合并版)
+        # 使用 assembleDebug 触发我们刚刚注入的全局压缩逻辑
         run: ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Fixed_Stable_Build
+          name: TVBox_Compressed_Build
           path: app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
