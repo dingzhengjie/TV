@@ -94,7 +94,7 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.incognitoText.setText(getSwitch(Setting.isIncognito()));
         mBinding.sizeText.setText((size = ResUtil.getStringArray(R.array.select_size))[Setting.getSize()]);
-        // --- 插入下面这行 ---
+        // --- 插入下面这行 (直接读取本地配置) ---
         mBinding.bootLiveText.setText(getSwitch(getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false)));
     }
 
@@ -117,7 +117,7 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.cache.setOnClickListener(this::onCache);
         mBinding.backup.setOnClickListener(this::onBackup);
         mBinding.player.setOnClickListener(this::onPlayer);
-        mBinding.bootLive.setOnClickListener(this::onBootLiveClick); 
+        mBinding.bootLive.setOnClickListener(this::setBootLive); 
         mBinding.restore.setOnClickListener(this::onRestore);
         mBinding.version.setOnClickListener(this::onVersion);
         mBinding.vod.setOnLongClickListener(this::onVodEdit);
@@ -322,13 +322,7 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         LiveConfig.get().init().load();
         WallConfig.get().init().load();
     }
-    private void onBootLiveClick(View view) {
-        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
-        boolean current = sp.getBoolean("boot_live", false);
-        sp.edit().putBoolean("boot_live", !current).apply();
-        mBinding.bootLiveText.setText(getSwitch(!current));
-    }
-
+    
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onConfigEvent(ConfigEvent event) {
         if (event.type() != ConfigEvent.Type.COMMON) return;
@@ -336,6 +330,20 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.liveUrl.setText(LiveConfig.getDesc());
         mBinding.wallUrl.setText(WallConfig.getDesc());
     }
+    private void setBootLive(View view) {
+        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+        boolean current = sp.getBoolean("boot_live", false);
+        sp.edit().putBoolean("boot_live", !current).apply();
+        mBinding.bootLiveText.setText(getSwitch(!current));
+    }
+
+    private void setBootLive(View view) {
+        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+        boolean current = sp.getBoolean("boot_live", false);
+        sp.edit().putBoolean("boot_live", !current).apply();
+        mBinding.bootLiveText.setText(getSwitch(!current));
+    }
+
 
     private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() != RESULT_OK || result.getData() == null || result.getData().getData() == null) return;
