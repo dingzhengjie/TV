@@ -87,6 +87,8 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private SiteViewModel mViewModel;
     private Result mResult;
     private Clock mClock;
+    // 在类里面定义一个静态变量，记录是否已经执行过自动跳转
+    private static boolean hasAutoJumped = false;
 
     private Site getHome() {
         return VodConfig.get().getHome();
@@ -107,8 +109,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         checkAction(intent);
     }
 
-    // 在类里面定义一个静态变量，记录是否已经执行过自动跳转
-    private static boolean hasAutoJumped = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
@@ -116,29 +117,19 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
         initEvent();
 
-        // --- 插入以下逻辑 ---
-        if (isFirst && getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false)) {
-            isFirst = false;
-            checkAndJump(0); // 开始检查并跳转
+        // --- 插入开始 ---
+        boolean isBootLive = getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false);
+        if (isBootLive && isFirst) {
+            isFirst = false; 
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if (!com.fongmi.android.tv.api.config.LiveConfig.get().getHome().isEmpty()) {
+                    com.fongmi.android.tv.ui.activity.LiveActivity.start(this);
+                }
+            }, 2500); // 延迟2.5秒，等配置加载
         }
+        // --- 插入结束 ---
     }
     
-
-    // --- 在 HomeActivity 类中添加这个递归检查方法 ---
-    private void checkAndJump(int retryCount) {
-        // 最多尝试 10 次（10秒）
-        if (retryCount > 10) return;
-
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            // 检查 LiveConfig 是否已经加载到了数据
-            if (!LiveConfig.get().getHome().isEmpty()) {
-                LiveActivity.start(this);
-            } else {
-                // 如果没加载好，1秒后再次尝试
-                checkAndJump(retryCount + 1);
-            }
-        }, 1000); 
-    }
 
     @Override
     protected void initView(Bundle savedInstanceState) {
