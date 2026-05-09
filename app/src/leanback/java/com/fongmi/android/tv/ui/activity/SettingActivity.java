@@ -337,14 +337,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.bootLiveText.setText(getSwitch(!current));
     }
 
-    private void setBootLive(View view) {
-        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
-        boolean current = sp.getBoolean("boot_live", false);
-        sp.edit().putBoolean("boot_live", !current).apply();
-        mBinding.bootLiveText.setText(getSwitch(!current));
-    }
-
-
     private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() != RESULT_OK || result.getData() == null || result.getData().getData() == null) return;
         setConfig(Config.find("file:/" + FileChooser.getPathFromUri(result.getData().getData()).replace(Path.rootPath(), ""), type));
