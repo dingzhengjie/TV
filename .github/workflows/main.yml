@@ -28,9 +28,13 @@ jobs:
 
       - name: 环境预处理与代码手术
         run: |
-          # 1. 物理移除签名配置 (解决 null 报错)[span_3](start_span)[span_3](end_span)
+          # 在 defaultConfig 中强行插入 multiDexEnabled true
+          sed -i '/defaultConfig {/a \        multiDexEnabled true' app/build.gradle
+          
+          # 你原有的逻辑
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
+
           
           # 2. 指定 Chaquopy 的 Python 路径[span_4](start_span)[span_4](end_span)
           PYTHON_PATH=$(which python3)
