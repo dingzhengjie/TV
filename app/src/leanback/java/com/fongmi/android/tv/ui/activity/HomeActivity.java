@@ -114,17 +114,32 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
 
-        // 只有在没有跳转过的情况下才执行
-        if (!hasAutoJumped) {
-            hasAutoJumped = true; // 标记为已跳转
-        
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                android.content.Intent intent = new android.content.Intent(this, LiveActivity.class);
-                startActivity(intent);
-                // 这里不写 finish()，返回时就能回到首页
-            }, 3000);
+        initEvent();
+
+        // --- 插入以下逻辑 ---
+        if (isFirst && getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false)) {
+            isFirst = false;
+            checkAndJump(0); // 开始检查并跳转
         }
     }
+    
+
+    // --- 在 HomeActivity 类中添加这个递归检查方法 ---
+    private void checkAndJump(int retryCount) {
+        // 最多尝试 10 次（10秒）
+        if (retryCount > 10) return;
+
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            // 检查 LiveConfig 是否已经加载到了数据
+            if (!LiveConfig.get().getHome().isEmpty()) {
+                LiveActivity.start(this);
+            } else {
+                // 如果没加载好，1秒后再次尝试
+                checkAndJump(retryCount + 1);
+            }
+        }, 1000); 
+    }
+
     @Override
     protected void initView(Bundle savedInstanceState) {
         mResult = Result.empty();
