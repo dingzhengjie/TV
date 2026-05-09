@@ -94,6 +94,8 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.incognitoText.setText(getSwitch(Setting.isIncognito()));
         mBinding.sizeText.setText((size = ResUtil.getStringArray(R.array.select_size))[Setting.getSize()]);
+        // --- 插入下面这行 ---
+        mBinding.bootLiveText.setText(getSwitch(getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false)));
     }
 
     private void setCacheText() {
