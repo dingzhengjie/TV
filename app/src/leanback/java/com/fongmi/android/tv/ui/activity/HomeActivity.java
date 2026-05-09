@@ -87,8 +87,8 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private SiteViewModel mViewModel;
     private Result mResult;
     private Clock mClock;
-    // 在类里面定义一个静态变量，记录是否已经执行过自动跳转
-    private static boolean hasAutoJumped = false;
+    private static boolean isFirst = true; // 添加这一行
+
 
     private Site getHome() {
         return VodConfig.get().getHome();
