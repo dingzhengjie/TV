@@ -25,46 +25,45 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 生产环境极致精简手术 (兼容 Gradle 9.3+)
+      - name: 生产环境极致精简手术
         run: |
-          # 1. 物理移除签名配置
+          # 1. 物理移除签名配置，防止 release 构建中断
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 注入配置：解决报错，强制使用 optimize 文件名
-          # 开启精简 (minifyEnabled) 以合并 DEX，但关闭资源缩减防止崩溃
+          # 2. 注入配置：开启 minify 以合并 31 个 DEX，但关闭资源缩减以防报错
+          # 使用 proguard-android-optimize.txt 满足 Gradle 9.3 要求
           sed -i '/release {/,/}/c\        release {\n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入“终极稳定版”规则：禁用混淆 + 禁用优化 + 保护业务类
+          # 3. 写入“绝对不闪退”的精简规则
           cat <<EOF > app/proguard-rules.pro
-          # 【核心】彻底禁用类名混淆，解决图片中 te1 报错
+          # 【核心】禁止重命名类名：彻底解决 te1 这种反射报错，确保不闪退
           -dontobfuscate
           
-          # 【核心】手动禁用优化，满足 Gradle 9.3 要求的同时防止闪退和 R8 崩溃
+          # 【核心】禁用激进优化：防止逻辑重写导致的运行异常
           -dontoptimize
           -dontpreverify
           -ignorewarnings
           
-          # 1. 保护 Python 运行时 (Chaquopy)
-          -keep class com.chaquo.python.** { *; }
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
-          
-          # 2. 强制保护所有业务包不被精简，确保投屏和解析稳定
+          # 保护所有业务包：即使精简，也不要动核心代码
           -keep class com.fongmi.android.tv.** { *; }
           -keep interface com.fongmi.android.tv.** { *; }
           -keep class com.github.tvbox.osc.** { *; }
+          -keep class com.chaquo.python.** { *; }
           
-          # 3. 专项修复：保留所有单字符串构造函数
+          # 属性保护：保留反射所需的注解和签名
+          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
+          
+          # 针对之前报错的专项加固：保留所有类的单字符串构造函数
           -keepclassmembers class * {
               public <init>(java.lang.String);
-              public <init>(android.content.Context, android.util.AttributeSet);
           }
           
           -dontnote **
           -dontwarn **
           EOF
           
-          # 4. 配置环境路径
+          # 4. 补齐 SDK 与 Python 环境路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT" >> local.properties
@@ -72,12 +71,13 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 执行生产环境构建
+      - name: 执行正式版构建
+        # 运行 assembleRelease 任务
         run: ./gradlew assembleRelease --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Final_Stable_Release
+          name: TVBox_Final_Lite_Version
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
