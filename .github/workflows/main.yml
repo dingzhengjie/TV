@@ -25,33 +25,38 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 生产环境极致精简手术 (不混淆版)
+      - name: 生产环境精简手术 (禁用混淆以防闪退)
         run: |
-          # 1. 物理移除签名配置，确保构建顺利
+          # 1. 物理移除签名配置，防止 release 构建中断
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 注入生产环境配置：开启压缩，强制关闭混淆
-          # 这样 R8 只会删掉没用的代码（减小 DEX 数量），但不会改名字（防止闪退）
+          # 2. 注入生产环境配置：开启精简 (minifyEnabled)，但关闭资源缩减 (防止 R8 崩溃)
+          # 强制设置 debuggable false 以生成正式包
           sed -i '/release {/,/}/c\        release {\n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入“只压缩不混淆”规则
+          # 3. 写入“只压缩、不改名”的保命规则
           cat <<EOF > app/proguard-rules.pro
-          # 关键指令：禁止混淆类名和方法名
+          # 【关键】禁用混淆：保留所有类名，彻底解决 image.png 中的 te1 报错
           -dontobfuscate
           
-          # 基础稳定性设置
+          # 基础稳定性：禁用字节码优化，防止 R8 内部索引越界
           -dontoptimize
           -dontpreverify
           -ignorewarnings
           
-          # 保护 Python 运行时 (Chaquopy)
+          # 必须保留：Chaquopy Python 环境
           -keep class com.chaquo.python.** { *; }
           -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           
-          # 保护所有业务代码，防止被误删
+          # 必须保留：业务逻辑核心包
           -keep class com.fongmi.android.tv.** { *; }
           -keep class com.github.tvbox.osc.** { *; }
+          
+          # 保护所有单字符串构造函数 (针对你图片报错的专项加固)
+          -keepclassmembers class * {
+              public <init>(java.lang.String);
+          }
           
           -dontnote **
           -dontwarn **
@@ -65,12 +70,12 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 强力构建生产版本
+      - name: 执行生产环境构建
         run: ./gradlew assembleRelease --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Lite_NoObfuscate
+          name: TVBox_Final_Stable_Release
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
