@@ -117,6 +117,7 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.cache.setOnClickListener(this::onCache);
         mBinding.backup.setOnClickListener(this::onBackup);
         mBinding.player.setOnClickListener(this::onPlayer);
+        mBinding.bootLive.setOnClickListener(this::onBootLiveClick); 
         mBinding.restore.setOnClickListener(this::onRestore);
         mBinding.version.setOnClickListener(this::onVersion);
         mBinding.vod.setOnLongClickListener(this::onVodEdit);
@@ -320,6 +321,12 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         VodConfig.get().init().load(getCallback());
         LiveConfig.get().init().load();
         WallConfig.get().init().load();
+    }
+    private void onBootLiveClick(View view) {
+        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+        boolean current = sp.getBoolean("boot_live", false);
+        sp.edit().putBoolean("boot_live", !current).apply();
+        mBinding.bootLiveText.setText(getSwitch(!current));
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
