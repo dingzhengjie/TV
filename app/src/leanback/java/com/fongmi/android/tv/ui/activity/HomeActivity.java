@@ -122,7 +122,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
                 android.content.Intent intent = new android.content.Intent(this, LiveActivity.class);
                 startActivity(intent);
                 // 这里不写 finish()，返回时就能回到首页
-            }, 1000);
+            }, 3000);
         }
     }
     @Override
