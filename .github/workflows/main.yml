@@ -53,7 +53,7 @@ jobs:
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-            - name: 生产模式构建
+      - name: 生产模式构建
         # 记得先在 build.gradle 处理签名，或使用此命令跳过正式签名（仅限测试）
         run: ./gradlew assembleRelease --no-daemon
 
