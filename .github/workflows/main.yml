@@ -3,6 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
+# 解决 Node.js 20 弃用警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -25,57 +26,31 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 极速压缩手术 (只合并DEX，不优化不混淆)
+      - name: 环境预处理与代码手术
         run: |
-          # 1. 移除签名配置
+          # 1. 物理移除签名配置 (解决 null 报错)[span_3](start_span)[span_3](end_span)
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 注入配置：开启缩减以合并 DEX，但禁用冗长的优化和资源缩减
-          sed -i '/buildTypes {/a \        all { \n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
-          
-          # 3. 写入“极速版”混淆规则
-          cat <<EOF > app/proguard-rules.pro
-          # 【提速核心】禁用最耗时的步骤：混淆类名和代码优化
-          -dontobfuscate
-          -dontoptimize
-          -dontpreverify
-          
-          # 忽略警告（减少日志输出也能提速）
-          -ignorewarnings
-          -dontnote **
-          -dontwarn **
-          
-          # 必须保留的业务代码 (防止被误删导致闪退)
-          -keep class com.fongmi.android.tv.** { *; }
-          -keep interface com.fongmi.android.tv.** { *; }
-          -keep class com.github.tvbox.osc.** { *; }
-          -keep class com.chaquo.python.** { *; }
-          
-          # 属性保护
-          -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
-          
-          # 专项加固构造函数
-          -keepclassmembers class * {
-              public <init>(java.lang.String);
-          }
-          EOF
-          
-          # 4. 补齐 SDK 与环境 (延续 main.txt.txt 逻辑)
+          # 2. 指定 Chaquopy 的 Python 路径[span_4](start_span)[span_4](end_span)
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
+          
+          # 3. 补齐 SDK 配置文件
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       - name: 赋予执行权限
         run: chmod +x gradlew
 
-      - name: 执行极速构建
-        # 使用 --parallel 开启并行编译进一步提速
-        run: ./gradlew assembleDebug --no-daemon --parallel --max-workers=4
+      - name: 强力构建
+        # 编译所有 debug 变体
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Lite_Fast_Build
+          name: TVBox_Build_Result
+          # 关键修改：使用通配符匹配所有可能的变体子目录
           path: app/build/outputs/apk/**/debug/*.apk
+          # 如果没找到文件，让 Workflow 报错而不是静默失败
           if-no-files-found: error
