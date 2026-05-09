@@ -25,39 +25,43 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 生产环境极致精简手术 (零混淆版)
+      - name: 生产环境极致精简手术 (稳定防闪退版)
         run: |
           # 1. 物理移除签名配置，防止 release 模式中断
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 注入生产环境配置：开启精简 (minifyEnabled)，但关闭资源缩减 (防止 R8 崩溃)
-          # 强制设置 debuggable false 以生成正式安装包
-          sed -i '/release {/,/}/c\        release {\n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
+          # 2. 注入配置：开启缩减 (minifyEnabled) 以合并 DEX，但关闭资源精简和优化以防 R8 崩溃
+          # 强制设置 debuggable false 以生成生产环境安装包
+          sed -i '/release {/,/}/c\        release {\n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入“只压缩、不改名”的保命规则 (解决闪退的核心)
+          # 3. 写入“保命级”规则：禁止混淆 + 强制保留所有业务类
           cat <<EOF > app/proguard-rules.pro
-          # 【关键】禁用混淆：保留所有原始类名，彻底解决 te1 这种报错
+          # 【核心】彻底禁用类名混淆，解决图片中 te1 这种找不到类的问题
           -dontobfuscate
           
-          # 稳定性设置：禁用激进优化，防止 R8 内部索引报错
+          # 【核心】彻底禁用代码优化，防止 R8 内部索引报错 (IndexOutOfBoundsException)
           -dontoptimize
           -dontpreverify
           -ignorewarnings
           
-          # 必须保留：Chaquopy Python 环境
+          # 1. 保护 Python 运行时 (Chaquopy)
           -keep class com.chaquo.python.** { *; }
           -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           
-          # 保护所有业务代码，防止被 R8 误判为无用代码而删掉
+          # 2. 强制保留所有业务逻辑包 (不混淆、不精简)
+          # 这样 R8 就不会动你的投屏、解析等核心逻辑
           -keep class com.fongmi.android.tv.** { *; }
+          -keep interface com.fongmi.android.tv.** { *; }
           -keep class com.github.tvbox.osc.** { *; }
           
-          # 针对图片报错：保护所有单字符串构造函数
+          # 3. 专项修复：保留所有单字符串构造函数 (解决图片报错的关键)
           -keepclassmembers class * {
               public <init>(java.lang.String);
+              public <init>(android.content.Context, android.util.AttributeSet);
           }
           
+          # 忽略第三方库的细碎警告
           -dontnote **
           -dontwarn **
           EOF
@@ -76,6 +80,6 @@ jobs:
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Production_Final
+          name: TVBox_Pro_Stable_Release
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
