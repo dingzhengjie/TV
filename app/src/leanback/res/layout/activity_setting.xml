@@ -252,6 +252,7 @@
                 android:textSize="18sp" />
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/incognito"
             android:layout_width="match_parent"
