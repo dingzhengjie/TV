@@ -25,44 +25,34 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 生产环境极致精简与防闪退手术
+      - name: 生产环境极致精简手术 (不混淆版)
         run: |
-          # 1. 物理移除签名配置，防止 release 模式报错
+          # 1. 物理移除签名配置，确保构建顺利
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
           
-          # 2. 注入稳定生产配置：开启混淆压缩，关闭不稳定的资源精简
-          # 使用 release 块，并强制 debuggable false
+          # 2. 注入生产环境配置：开启压缩，强制关闭混淆
+          # 这样 R8 只会删掉没用的代码（减小 DEX 数量），但不会改名字（防止闪退）
           sed -i '/release {/,/}/c\        release {\n            debuggable false\n            minifyEnabled true\n            shrinkResources false\n            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"\n        }' app/build.gradle
           
-          # 3. 写入“保命级”混淆规则 (解决闪退的核心)
+          # 3. 写入“只压缩不混淆”规则
           cat <<EOF > app/proguard-rules.pro
-          # 基础：关闭激进优化，保证老旧电视硬件兼容
+          # 关键指令：禁止混淆类名和方法名
+          -dontobfuscate
+          
+          # 基础稳定性设置
           -dontoptimize
           -dontpreverify
           -ignorewarnings
           
-          # 1. 保护 Python 运行时 (Chaquopy)
+          # 保护 Python 运行时 (Chaquopy)
           -keep class com.chaquo.python.** { *; }
           -keepattributes *Annotation*, EnclosingMethod, InnerClasses, Signature, SourceFile, LineNumberTable
           
-          # 2. 核心：彻底保护 com.fongmi 和主项目包 (修复 te1 这种找不到类导致的闪退)
-          # 注意：这里保持整个包不被混淆，是牺牲一点点混淆度来换取绝对的运行稳定
+          # 保护所有业务代码，防止被误删
           -keep class com.fongmi.android.tv.** { *; }
-          -keep interface com.fongmi.android.tv.** { *; }
+          -keep class com.github.tvbox.osc.** { *; }
           
-          # 3. 修复反射构造报错
-          -keepclassmembers class * {
-              public <init>(java.lang.String);
-              public <init>(android.content.Context, android.util.AttributeSet);
-          }
-          
-          # 4. 保护 TVBox 数据模型与 JS 桥接，防止解析视频源闪退
-          -keep class com.github.tvbox.osc.bean.** { *; }
-          -keep class com.github.tvbox.osc.util.js.** { *; }
-          -keep class com.github.tvbox.osc.base.** { *; }
-          
-          # 5. 忽略第三方库琐碎警告
           -dontnote **
           -dontwarn **
           EOF
@@ -81,6 +71,6 @@ jobs:
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Final_Release
+          name: TVBox_Lite_NoObfuscate
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
