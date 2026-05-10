@@ -359,18 +359,18 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void setActivated() {
+        // 原有逻辑
         mChannelAdapter.setSelected(mChannel);
         notifyItemChanged(mBinding.channel, mChannelAdapter);
-        // 更新面板实时数据
-        // --- 修正后的面板更新逻辑 ---
-        if (isVisible(mBinding.linePanel)) {
-            // 使用标准 Java 格式获取时间，避免调用不存在的 mClock.getTime()
-            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-            mBinding.panelTime.setText(sdf.format(new Date()));
-            // 网速更新
-            Traffic.setSpeed(mBinding.panelNetSpeed);
-        }
         
+        // 修正后的面板更新逻辑：直接在这里更新时间和网速
+        if (mBinding.linePanel != null && mBinding.linePanel.getVisibility() == View.VISIBLE) {
+            // 使用 Java 标准库获取时间，不依赖 mClock
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+            mBinding.panelTime.setText(sdf.format(new java.util.Date()));
+            // 更新网速
+            com.fongmi.android.tv.utils.Traffic.setSpeed(mBinding.panelNetSpeed);
+        }
         fetch();
     }
 
