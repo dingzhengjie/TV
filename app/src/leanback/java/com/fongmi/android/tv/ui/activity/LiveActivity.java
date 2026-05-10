@@ -70,12 +70,12 @@ import com.fongmi.android.tv.utils.Traffic;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
-//
+
 import androidx.media3.common.PlaybackException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-//
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -360,20 +360,23 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void setActivated() {
-        // 原有逻辑
+        // --- 核心逻辑 A：同步频道选中状态 ---
         mChannelAdapter.setSelected(mChannel);
         notifyItemChanged(mBinding.channel, mChannelAdapter);
         
-        // 修正后的面板更新逻辑：直接在这里更新时间和网速
+        // --- 核心逻辑 B：更新面板时间和网速 (防止闪退的关键) ---
         if (mBinding.linePanel != null && mBinding.linePanel.getVisibility() == View.VISIBLE) {
-            // 使用 Java 标准库获取时间，不依赖 mClock
+            // 修复点：直接用 Java 系统方法获取时间，不调用不存在的 mClock.getTime()
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
             mBinding.panelTime.setText(sdf.format(new java.util.Date()));
             // 更新网速
             com.fongmi.android.tv.utils.Traffic.setSpeed(mBinding.panelNetSpeed);
         }
+        
+        // --- 核心逻辑 C：执行播放请求 ---
         fetch();
     }
+
 
     private void setActivated(EpgData item) {
         mEpgDataAdapter.setSelected(item);
