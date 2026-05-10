@@ -160,8 +160,8 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     @Override
     protected void initView(Bundle savedInstanceState) {
         super.initView(savedInstanceState);
-        mClock = Clock.create(mBinding.widget.clock);
-        mKeyDown = CustomKeyDownLive.create(this);
+        //mClock = Clock.create(mBinding.widget.clock);
+        //mKeyDown = CustomKeyDownLive.create(this);
         mObserveEpg = this::setEpg;
         mObserveUrl = this::start;
         mHides = new ArrayList<>();
@@ -170,8 +170,16 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
         mR4 = this::hideUI;
+        // 1. 【必须最先执行】初始化基础组件和布局绑定
+        mClock = new Clock();
+        mKeyDown = new KeyDown(this);
+        
+        // 2. 【核心】这些方法会初始化播放器和 UI 控件 (mBinding)
+        setRecyclerView();
+        setVideoView(); // 执行完这个，player() 才可能不为空
+        setViewModel(); // 执行完这个，mChannel 才会有数据
 
-        // 增加非空判断保护
+        // 3. 【最后执行】等上面的门窗都装好了，再挂载你的自定义监听逻辑
         if (player() != null && player().getPlayer() != null) {
             player().getPlayer().addListener(new androidx.media3.common.Player.Listener() {
                 @Override
@@ -182,12 +190,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 }
             });
         }
-        
-        // 确保这些初始化方法在最后执行
-        
-        setRecyclerView();
-        setVideoView();
-        setViewModel();
 
     }
 
