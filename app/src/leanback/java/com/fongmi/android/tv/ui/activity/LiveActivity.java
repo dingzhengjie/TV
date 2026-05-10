@@ -1050,85 +1050,70 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         showControl(getFocus2());
     }*/
 
+
     @Override
     public void onMenu() {
-        // 1. 隐藏多余 UI
         if (isVisible(mBinding.control.getRoot())) hideControl();
         if (isVisible(mBinding.recycler)) hideUI();
 
-        // 2. 显示面板
-        mBinding.linePanel.setVisibility(View.VISIBLE);
-    
-        // 3. 定义 6 个类目名称
-        String[] menuNames = {"线路选择", "画面比例", "播放解码", "超时换源", "偏好设置", "多源切换"};
+        if (mBinding.linePanel != null) {
+            mBinding.linePanel.setVisibility(View.VISIBLE);
+            
+            // 准备数据
+            List<String> items = new ArrayList<>();
+            items.add("线路选择");
+            items.add("画面比例");
+            items.add("播放解码");
+            items.add("超时换源");
+            items.add("偏好设置");
+            items.add("多源切换");
 
-        // 4. 给列表填充内容 (Adapter)
-        if (mBinding.panelRecycler.getAdapter() == null) {
-            mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-            mBinding.panelRecycler.setAdapter(new androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
-                @NonNull
-                @Override
-                public androidx.recyclerview.widget.RecyclerView.ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
-                    // 创建每一个选项的样式
-                    android.widget.TextView tv = new android.widget.TextView(parent.getContext());
-                    tv.setLayoutParams(new android.view.ViewGroup.LayoutParams(-1, ResUtil.dp2px(45)));
-                    tv.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                    tv.setPadding(ResUtil.dp2px(20), 0, 0, 0);
-                    tv.setTextColor(android.graphics.Color.WHITE);
-                    tv.setFocusable(true);
-                    tv.setFocusableInTouchMode(true);
-                    // 借用系统自带的选中背景
-                    tv.setBackgroundResource(com.fongmi.android.tv.R.drawable.selector_item_live); 
-                    return new androidx.recyclerview.widget.RecyclerView.ViewHolder(tv) {};
-                }
+            if (mBinding.panelRecycler.getAdapter() == null) {
+                mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+                mBinding.panelRecycler.setAdapter(new androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
+                    @NonNull
+                    @Override
+                    public androidx.recyclerview.widget.RecyclerView.ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
+                        android.widget.TextView tv = new android.widget.TextView(parent.getContext());
+                        tv.setLayoutParams(new android.view.ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(40)));
+                        tv.setGravity(android.view.Gravity.CENTER);
+                        tv.setTextColor(android.graphics.Color.WHITE);
+                        tv.setFocusable(true);
+                        tv.setClickable(true);
+                        tv.setBackgroundResource(com.fongmi.android.tv.R.drawable.selector_item_live); 
+                        return new androidx.recyclerview.widget.RecyclerView.ViewHolder(tv) {};
+                    }
 
-                @Override
-                public void onBindViewHolder(@NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder holder, int position) {
-                    android.widget.TextView tv = (android.widget.TextView) holder.itemView;
-                    tv.setText(menuNames[position]);
-                    // 设置点击功能
-                    tv.setOnClickListener(v -> onPanelItemClick(position));
-                }
+                    @Override
+                    public void onBindViewHolder(@NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder holder, int position) {
+                        android.widget.TextView tv = (android.widget.TextView) holder.itemView;
+                        tv.setText(items.get(position));
+                        tv.setOnClickListener(v -> onPanelItemClick(position));
+                    }
 
-                @Override
-                public int getItemCount() { return menuNames.length; }
-            });
+                    @Override
+                    public int getItemCount() { return items.size(); }
+                });
+            }
+            mBinding.panelRecycler.requestFocus();
         }
 
-        // 5. 让列表获取焦点，这样遥控器就能选了
-        mBinding.panelRecycler.requestFocus();
-    
-        // 6. 开启 5 秒自动隐藏
         App.removeCallbacks(mR1);
         App.post(mR1, 5000); 
     }
 
-
-        @Override
-        public void onBindViewHolder(@NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder holder, int position) {
-            android.widget.TextView tv = (android.widget.TextView) holder.itemView;
-            tv.setText(menuNames[position]);
-            // 设置点击功能
-            tv.setOnClickListener(v -> onPanelItemClick(position));
-        }
-        // 5. 让列表获取焦点，这样遥控器就能选了
-        mBinding.panelRecycler.requestFocus();
-    
-        // 6. 开启 5 秒自动隐藏
-        App.removeCallbacks(mR1);
-        App.post(mR1, 5000); 
-    }
     private void onPanelItemClick(int position) {
         switch (position) {
-            case 0: nextLine(true); break; // 换线
-            case 1: onScale(); break;     // 比例
-            case 2: onDecode(); break;    // 解码
-            case 3: break;                // 超时 (可选实现)
-            case 4: onConfig(); break;    // 设置
-            case 5: onHome(); break;      // 多源
+            case 0: nextLine(true); break;
+            case 1: onScale(); break;
+            case 2: onDecode(); break;
+            case 3: break; 
+            case 4: onConfig(); break;
+            case 5: onHome(); break;
         }
-        mBinding.linePanel.setVisibility(View.GONE); // 点完消失
+        mBinding.linePanel.setVisibility(View.GONE);
     }
+
 
 
     @Override
