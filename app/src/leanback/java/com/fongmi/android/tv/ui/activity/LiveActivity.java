@@ -364,6 +364,9 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void setActivated() {
+        // 增加 mBinding 的保护，防止在 Activity 还没创建完时被调用
+        if (mBinding == null) return; 
+        
         // --- 核心逻辑 A：同步频道选中状态 ---
         mChannelAdapter.setSelected(mChannel);
         notifyItemChanged(mBinding.channel, mChannelAdapter);
