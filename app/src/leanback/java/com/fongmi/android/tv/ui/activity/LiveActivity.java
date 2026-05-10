@@ -160,8 +160,8 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     @Override
     protected void initView(Bundle savedInstanceState) {
         super.initView(savedInstanceState);
-        //mClock = Clock.create(mBinding.widget.clock);
-        //mKeyDown = CustomKeyDownLive.create(this);
+        mClock = Clock.create(mBinding.widget.clock);
+        mKeyDown = CustomKeyDownLive.create(this);
         mObserveEpg = this::setEpg;
         mObserveUrl = this::start;
         mHides = new ArrayList<>();
@@ -170,9 +170,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
         mR4 = this::hideUI;
-        // 1. 【必须最先执行】初始化基础组件和布局绑定
-        mClock = new Clock();
-        mKeyDown = new KeyDown(this);
+
         
         // 2. 【核心】这些方法会初始化播放器和 UI 控件 (mBinding)
         setRecyclerView();
