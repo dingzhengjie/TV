@@ -362,10 +362,13 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mChannelAdapter.setSelected(mChannel);
         notifyItemChanged(mBinding.channel, mChannelAdapter);
         // 更新面板实时数据
+        // --- 修正后的面板更新逻辑 ---
         if (isVisible(mBinding.linePanel)) {
-            mBinding.panelTime.setText(mClock.getTime());
-            // 使用 Fongmi 框架的 Traffic 类获取速度
-            Traffic.setSpeed(mBinding.panelNetSpeed); 
+            // 使用标准 Java 格式获取时间，避免调用不存在的 mClock.getTime()
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            mBinding.panelTime.setText(sdf.format(new Date()));
+            // 网速更新
+            Traffic.setSpeed(mBinding.panelNetSpeed);
         }
         
         fetch();
