@@ -17,7 +17,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
-Import androidx.media3.common.PlaybackException;
+import androidx.media3.common.PlaybackException;
 import androidx.media3.common.VideoSize;
 import androidx.media3.ui.PlayerView;
 import androidx.recyclerview.widget.RecyclerView;
