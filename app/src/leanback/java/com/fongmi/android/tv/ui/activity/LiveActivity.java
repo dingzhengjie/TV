@@ -175,7 +175,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         // 插入：监听播放错误实现自动跳台
         player().getPlayer().addListener(new Player.Listener() {
             @Override
-            public void onPlayerError(@NonNull PlaybackException error) {
+            public void onPlayerError(@NonNull androidx.media3.common.PlaybackException error) {
                 if (mChannel == null) return;
                 if (!mChannel.isLast()) {
                     nextLine(false); // 自动换下一条线
