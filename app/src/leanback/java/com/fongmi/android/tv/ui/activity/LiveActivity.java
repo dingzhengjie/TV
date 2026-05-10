@@ -154,6 +154,18 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     protected void onServiceConnected() {
         mBinding.control.action.speed.setText(player().getSpeedText());
         mBinding.control.action.decode.setText(player().getDecodeText());
+        
+        // 在这里挂载监听器，100% 不会报空指针
+        if (player().getPlayer() != null) {
+            player().getPlayer().addListener(new androidx.media3.common.Player.Listener() {
+                @Override
+                public void onPlayerError(@NonNull androidx.media3.common.PlaybackException error) {
+                    if (mChannel == null) return;
+                    if (!mChannel.isLast()) nextLine(false);
+                    else nextChannel();
+                }
+            });
+        }
         checkLive();
     }
 
@@ -170,24 +182,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
         mR4 = this::hideUI;
-
         
         // 2. 【核心】这些方法会初始化播放器和 UI 控件 (mBinding)
         setRecyclerView();
         setVideoView(); // 执行完这个，player() 才可能不为空
         setViewModel(); // 执行完这个，mChannel 才会有数据
-
-        // 3. 【最后执行】等上面的门窗都装好了，再挂载你的自定义监听逻辑
-        if (player() != null && player().getPlayer() != null) {
-            player().getPlayer().addListener(new androidx.media3.common.Player.Listener() {
-                @Override
-                public void onPlayerError(@NonNull androidx.media3.common.PlaybackException error) {
-                    if (mChannel == null) return;
-                    if (!mChannel.isLast()) nextLine(false);
-                    else nextChannel();
-                }
-            });
-        }
 
     }
 
