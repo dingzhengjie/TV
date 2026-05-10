@@ -1045,19 +1045,22 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         showControl(getFocus2());
     }*/
+
     @Override
     public void onMenu() {
+        // 隐藏其他干扰 UI
         if (isVisible(mBinding.control.getRoot())) hideControl();
         if (isVisible(mBinding.recycler)) hideUI();
         
-        // 显示 6 项功能面板
-        mBinding.linePanel.setVisibility(View.VISIBLE);
+        // 显示 6 项面板
+        if (mBinding.linePanel != null) {
+            mBinding.linePanel.setVisibility(View.VISIBLE);
+            // 刷新一次数据
+            setActivated(); 
+            mBinding.panelRecycler.requestFocus();
+        }
         
-        // 这里需要实现一个简单的适配器加载以下 6 个字符串：
-        // {"线路选择", "画面比例", "播放解码", "超时换源", "偏好设置", "多源切换"}
-        // 绑定数据到 mBinding.panelRecycler 并设置点击事件指向 onPanelClick
-        
-        mBinding.panelRecycler.requestFocus();
+        App.removeCallbacks(mR1);
         App.post(mR1, 5000); 
     }
     private void onPanelClick(int position) {
