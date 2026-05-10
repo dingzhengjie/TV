@@ -167,6 +167,18 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         setRecyclerView();
         setVideoView();
         setViewModel();
+        // 插入：监听播放错误实现自动跳台
+        player().getPlayer().addListener(new Player.Listener() {
+            @Override
+            public void onPlayerError(@NonNull PlaybackException error) {
+                if (mChannel == null) return;
+                if (!mChannel.isLast()) {
+                    nextLine(false); // 自动换下一条线
+                } else {
+                    nextChannel(); // 全线失效换下一台
+                }
+            }
+        });
     }
 
     @Override
@@ -1014,10 +1026,48 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         showUI();
     }
 
-    @Override
+    /*@Override
     public void onMenu() {
         showControl(getFocus2());
+    }*/
+    @Override
+    public void onMenu() {
+        if (isVisible(mBinding.control.getRoot())) hideControl();
+        if (isVisible(mBinding.recycler)) hideUI();
+        
+        // 显示 6 项功能面板
+        mBinding.linePanel.setVisibility(View.VISIBLE);
+        
+        // 这里需要实现一个简单的适配器加载以下 6 个字符串：
+        // {"线路选择", "画面比例", "播放解码", "超时换源", "偏好设置", "多源切换"}
+        // 绑定数据到 mBinding.panelRecycler 并设置点击事件指向 onPanelClick
+        
+        mBinding.panelRecycler.requestFocus();
+        App.post(mR1, 5000); 
     }
+    private void onPanelClick(int position) {
+        switch (position) {
+            case 0: // 线路选择
+                nextLine(true);
+                break;
+            case 1: // 画面比例
+                onScale();
+                break;
+            case 2: // 播放解码
+                onDecode();
+                break;
+            case 3: // 超时换源
+                // 逻辑：修改 Setting.getTimeout() 的步长
+                break;
+            case 4: // 偏好设置
+                onConfig();
+                break;
+            case 5: // 多源切换
+                onHome();
+                break;
+        }
+    }
+
 
     @Override
     public void onSingleTap() {
@@ -1045,7 +1095,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
     @Override
     protected void onBackInvoked() {
-        if (isVisible(mBinding.control.getRoot())) {
+        
+        if (isVisible(mBinding.linePanel)) {
+            mBinding.linePanel.setVisibility(View.GONE);
+        } else if (isVisible(mBinding.control.getRoot())) {
             hideControl();
         } else if (isVisible(mBinding.widget.bottom)) {
             hideInfo();
@@ -1066,4 +1119,19 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mViewModel.epg().removeObserver(mObserveEpg);
         super.onDestroy();
     }
+    // 搜索 private Runnable mR0; 在 initView 里赋值的地方
+    // 修改为以下逻辑：
+    private void setActivated() {
+        mChannelAdapter.setSelected(mChannel);
+        notifyItemChanged(mBinding.channel, mChannelAdapter);
+        
+        // 更新面板实时数据
+        if (isVisible(mBinding.linePanel)) {
+            mBinding.panelTime.setText(mClock.getTime());
+            // 使用 Fongmi 框架的 Traffic 类获取速度
+            Traffic.setSpeed(mBinding.panelNetSpeed); 
+        }
+        fetch();
+    }
+
 }
