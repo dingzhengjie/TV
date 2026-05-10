@@ -1080,7 +1080,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         tv.setTextColor(android.graphics.Color.WHITE);
                         tv.setFocusable(true);
                         tv.setClickable(true);
-                        tv.setBackgroundResource(com.fongmi.android.tv.R.drawable.selector_item); 
+                        tv.setBackgroundResource(0); 
                         return new androidx.recyclerview.widget.RecyclerView.ViewHolder(tv) {};
                     }
 
