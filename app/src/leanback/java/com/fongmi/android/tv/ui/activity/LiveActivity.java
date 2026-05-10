@@ -467,6 +467,9 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void hideUI() {
+        // 关键检查：如果 binding 已经没了，直接退出方法，不要往下跑
+        if (mBinding == null) return; 
+
         App.removeCallbacks(mR4);
         if (isGone(mBinding.recycler)) return;
         mBinding.recycler.setVisibility(View.GONE);
@@ -474,6 +477,8 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     private void showUI() {
+        // 关键检查：防止异步调用时 Activity 已销毁
+        if (mBinding == null) return;
         if (isVisible(mBinding.recycler) || mGroupAdapter.getItemCount() == 0) return;
         mBinding.recycler.setVisibility(View.VISIBLE);
         setPosition();
