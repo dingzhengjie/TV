@@ -170,21 +170,25 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
         mR4 = this::hideUI;
+
+        // 增加非空判断保护
+        if (player() != null && player().getPlayer() != null) {
+            player().getPlayer().addListener(new androidx.media3.common.Player.Listener() {
+                @Override
+                public void onPlayerError(@NonNull androidx.media3.common.PlaybackException error) {
+                    if (mChannel == null) return;
+                    if (!mChannel.isLast()) nextLine(false);
+                    else nextChannel();
+                }
+            });
+        }
+        
+        // 确保这些初始化方法在最后执行
+        
         setRecyclerView();
         setVideoView();
         setViewModel();
-        // 插入：监听播放错误实现自动跳台
-        player().getPlayer().addListener(new Player.Listener() {
-            @Override
-            public void onPlayerError(@NonNull androidx.media3.common.PlaybackException error) {
-                if (mChannel == null) return;
-                if (!mChannel.isLast()) {
-                    nextLine(false); // 自动换下一条线
-                } else {
-                    nextChannel(); // 全线失效换下一台
-                }
-            }
-        });
+
     }
 
     @Override
