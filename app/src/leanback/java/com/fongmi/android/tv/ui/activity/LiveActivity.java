@@ -356,6 +356,13 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     private void setActivated() {
         mChannelAdapter.setSelected(mChannel);
         notifyItemChanged(mBinding.channel, mChannelAdapter);
+        // 更新面板实时数据
+        if (isVisible(mBinding.linePanel)) {
+            mBinding.panelTime.setText(mClock.getTime());
+            // 使用 Fongmi 框架的 Traffic 类获取速度
+            Traffic.setSpeed(mBinding.panelNetSpeed); 
+        }
+        
         fetch();
     }
 
@@ -1118,20 +1125,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mViewModel.url().removeObserver(mObserveUrl);
         mViewModel.epg().removeObserver(mObserveEpg);
         super.onDestroy();
-    }
-    // 搜索 private Runnable mR0; 在 initView 里赋值的地方
-    // 修改为以下逻辑：
-    private void setActivated() {
-        mChannelAdapter.setSelected(mChannel);
-        notifyItemChanged(mBinding.channel, mChannelAdapter);
-        
-        // 更新面板实时数据
-        if (isVisible(mBinding.linePanel)) {
-            mBinding.panelTime.setText(mClock.getTime());
-            // 使用 Fongmi 框架的 Traffic 类获取速度
-            Traffic.setSpeed(mBinding.panelNetSpeed); 
-        }
-        fetch();
     }
 
 }
