@@ -76,6 +76,11 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         listener.onShow(text.toString());
         App.post(runnable, 2000);
     }
+    @Override
+    public void onLongPress(MotionEvent e) {
+        if (mListener != null) mListener.onLongPress();
+    }
+
 
     @Override
     public boolean onDoubleTap(@NonNull MotionEvent e) {
@@ -118,6 +123,8 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         void onKeyUp();
 
         void onKeyDown();
+        void onLongPress(); // <--- 必须添加这一行
+        // ... 其他已有的方法如 onSingleTap, onDoubleTap
 
         void onKeyLeft(long time);
 
