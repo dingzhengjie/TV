@@ -47,6 +47,15 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
     public void onKeyDown(KeyEvent event) {
         if (listener.dispatch(true)) check(event);
     }
+  // 在 CustomKeyDownLive.java 约 100-150 行附近
+    @Override
+    public void onLongPress(MotionEvent e) {
+        super.onLongPress(e);
+        // 这里是核心：将手势分发给 Activity (Listener)
+        if (listener != null) {
+            listener.onLongPress();
+        }
+    }
 
     private void check(KeyEvent event) {
         if (KeyUtil.isActionDown(event) && KeyUtil.isLeftKey(event)) {
@@ -76,11 +85,6 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         listener.onShow(text.toString());
         App.post(runnable, 2000);
     }
-    @Override
-    public void onLongPress(MotionEvent e) {
-        if (mListener != null) mListener.onLongPress();
-    }
-
 
     @Override
     public boolean onDoubleTap(@NonNull MotionEvent e) {
