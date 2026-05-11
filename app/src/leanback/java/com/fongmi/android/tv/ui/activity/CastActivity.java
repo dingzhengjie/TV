@@ -464,6 +464,11 @@ public class CastActivity extends PlaybackActivity implements CustomKeyDownVod.L
     public void onKeyDown() {
         showControl();
     }
+    @Override
+    public void onLongPress() {
+        // 点播/投屏页面暂时不需要长按菜单，所以留空即可
+    }
+
 
     @Override
     public void onKeyCenter() {
