@@ -269,31 +269,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.control.action.player.setOnClickListener(view -> onChoose());
         mBinding.control.action.decode.setOnClickListener(view -> onDecode());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
-        
-                // 点击左侧关闭所有菜单
-        findViewById(R.id.panelBlank).setOnClickListener(v -> {
-            mBinding.linePanel.setVisibility(View.GONE);
-            mBinding.recycler.setVisibility(View.GONE);
-        });
-
-        // 屏幕点击逻辑
-        mBinding.video.setOnClickListener(new View.OnClickListener() {
-            private long lastClickTime = 0;
-            @Override
-            public void onClick(View v) {
-                long currentTime = System.currentTimeMillis();
-                if (currentTime - lastClickTime < 350) {
-                    onMenu(); // 双击弹设置
-                } else {
-                    if (!isVisible(mBinding.linePanel)) {
-                        showUI(); // 单击弹频道列表
-                    } else {
-                        mBinding.linePanel.setVisibility(View.GONE);
-                    }
-                }
-                lastClickTime = currentTime;
-            }
-        });
+ 
 
     }
 
