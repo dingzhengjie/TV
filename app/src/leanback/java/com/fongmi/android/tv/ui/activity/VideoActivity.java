@@ -1389,10 +1389,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     public void onKeyDown() {
         showControl(getFocus2());
     }
-    @Override
-    public void onLongPress() {
-        // 点播/投屏页面暂时不需要长按菜单，所以留空即可
-    }
+    
 
     @Override
     public void onKeyCenter() {
