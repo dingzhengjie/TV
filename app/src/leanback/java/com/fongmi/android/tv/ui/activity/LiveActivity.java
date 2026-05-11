@@ -1066,57 +1066,103 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         showControl(getFocus2());
     }*/
 
-
     @Override
     public void onMenu() {
         if (isVisible(mBinding.control.getRoot())) hideControl();
-        if (isVisible(mBinding.recycler)) hideUI();
-
+        
         if (mBinding.linePanel != null) {
             mBinding.linePanel.setVisibility(View.VISIBLE);
+            showUI(); // 确保左侧区域可见
             
-            // 准备数据
-            List<String> items = new ArrayList<>();
-            items.add("线路选择");
-            items.add("画面比例");
-            items.add("播放解码");
-            items.add("超时换源");
-            items.add("偏好设置");
-            items.add("多源切换");
+            // 右侧一级菜单项
+            List<String> mainItems = Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+            
+            mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                @NonNull
+                @Override
+                public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                    TextView tv = new TextView(parent.getContext());
+                    tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+                    tv.setGravity(android.view.Gravity.CENTER);
+                    tv.setFocusable(true);
+                    tv.setTextColor(android.graphics.Color.WHITE);
+                    tv.setBackgroundResource(R.drawable.selector_item);
+                    return new RecyclerView.ViewHolder(tv) {};
+                }
 
-            if (mBinding.panelRecycler.getAdapter() == null) {
-                mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-                mBinding.panelRecycler.setAdapter(new androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
-                    @NonNull
-                    @Override
-                    public androidx.recyclerview.widget.RecyclerView.ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
-                        android.widget.TextView tv = new android.widget.TextView(parent.getContext());
-                        tv.setLayoutParams(new android.view.ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(40)));
-                        tv.setGravity(android.view.Gravity.CENTER);
-                        tv.setTextColor(android.graphics.Color.WHITE);
-                        tv.setFocusable(true);
-                        tv.setClickable(true);
-                        tv.setBackgroundResource(0); 
-                        return new androidx.recyclerview.widget.RecyclerView.ViewHolder(tv) {};
-                    }
-
-                    @Override
-                    public void onBindViewHolder(@NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder holder, int position) {
-                        android.widget.TextView tv = (android.widget.TextView) holder.itemView;
-                        tv.setText(items.get(position));
-                        tv.setOnClickListener(v -> onPanelItemClick(position));
-                    }
-
-                    @Override
-                    public int getItemCount() { return items.size(); }
-                });
-            }
+                @Override
+                public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                    TextView tv = (TextView) holder.itemView;
+                    tv.setText(mainItems.get(position));
+                    
+                    // 当右侧项获得焦点时，左侧列表立刻刷新为对应的二级选项
+                    tv.setOnFocusChangeListener((v, hasFocus) -> {
+                        if (hasFocus) {
+                            mCurrentMenu = position; 
+                            refreshLeftAdapter(); 
+                        }
+                    });
+                }
+                @Override
+                public int getItemCount() { return mainItems.size(); }
+            });
             mBinding.panelRecycler.requestFocus();
         }
-
-        App.removeCallbacks(mR1);
-        App.post(mR1, 5000); 
     }
+
+    // 刷新左侧列表为二级菜单
+    private void refreshLeftAdapter() {
+        List<String> subItems = new ArrayList<>();
+        if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
+        else if (mCurrentMenu == 1) subItems.addAll(Arrays.asList("硬件解码", "软件解码", "原生解码"));
+        else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
+        else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
+
+        mBinding.recycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            @NonNull
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                TextView tv = new TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+                tv.setGravity(android.view.Gravity.CENTER);
+                tv.setFocusable(true);
+                tv.setBackgroundResource(R.drawable.selector_item);
+                return new RecyclerView.ViewHolder(tv) {};
+            }
+
+            @Override
+            public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                TextView tv = (TextView) holder.itemView;
+                String text = subItems.get(position);
+                tv.setText(text);
+
+                // --- 实时高亮逻辑 ---
+                android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+                boolean isSelected = false;
+                if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
+                else if (mCurrentMenu == 3) {
+                    boolean boot = sp.getBoolean("boot_live", false);
+                    if ((boot && text.contains("开")) || (!boot && text.contains("关"))) isSelected = true;
+                }
+
+                tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
+                
+                tv.setOnClickListener(v -> {
+                    if (mCurrentMenu == 0) onScale(position);
+                    else if (mCurrentMenu == 1) onDecode(position);
+                    else if (mCurrentMenu == 2) {
+                        int[] vals = {5, 15, 30, 60};
+                        updateSetting("timeout", vals[position]);
+                    } else if (mCurrentMenu == 3) {
+                        updateSetting("boot_live", position == 1);
+                    }
+                });
+            }
+            @Override
+            public int getItemCount() { return subItems.size(); }
+        });
+    }
+
 
     private void onPanelItemClick(int position) {
         switch (position) {
