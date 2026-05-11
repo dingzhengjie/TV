@@ -105,6 +105,9 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
 
         void onKeyDown();
 
+        void onLongPress(); // <--- 必须添加这一行
+    // ... 其他已有的方法如 onSingleTap, onDoubleTap
+
         void onKeyCenter();
 
         void onSingleTap();
