@@ -211,6 +211,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         setRecyclerView();
         setVideoView(); // 执行完这个，player() 才可能不为空
         setViewModel(); // 执行完这个，mChannel 才会有数据
+        // 直接给根视图绑定长按，不经过手势库
+        mBinding.getRoot().setOnLongClickListener(v -> {
+            onMenu();
+            return true; // 返回 true 表示消耗掉这个事件，不触发其他动作
+        });
 
     }
 
