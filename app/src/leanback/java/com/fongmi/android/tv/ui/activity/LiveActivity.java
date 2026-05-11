@@ -217,30 +217,34 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             return true; // 返回 true 表示消耗掉这个事件，不触发其他动作
         });
         */
-        // 点击左侧透明区域关闭设置菜单
-        mBinding.panelBlank.setOnClickListener(v -> mBinding.linePanel.setVisibility(View.GONE));
-
-        // 修复屏幕点击：单击弹频道列表，双击弹设置菜单
+           // 在 initView() 内部最后一行 setEvent(); 之前插入：
+    
+        // A. 点击左侧空白区域，同时关闭设置菜单和二级菜单容器
+        findViewById(R.id.panelBlank).setOnClickListener(v -> {
+            mBinding.linePanel.setVisibility(View.GONE);
+            mBinding.recycler.setVisibility(View.GONE);
+        });
+    
+        // B. 屏幕触摸逻辑：区分单击/双击
         mBinding.video.setOnClickListener(new View.OnClickListener() {
             private long lastClickTime = 0;
             @Override
             public void onClick(View v) {
                 long currentTime = System.currentTimeMillis();
-                if (currentTime - lastClickTime < 350) {
-                    onMenu(); // 双击弹出右侧设置菜单
+                if (currentTime - lastClickTime < 350) { 
+                    onMenu(); // 【双击】弹出变窄的设置菜单
                 } else {
-                    // 单击逻辑
+                    // 【单击】
                     if (isVisible(mBinding.linePanel)) {
-                        mBinding.linePanel.setVisibility(View.GONE);
-                    } else if (isVisible(mBinding.recycler)) {
-                        hideUI();
+                        mBinding.linePanel.setVisibility(View.GONE); // 如果设置开着，单击关闭
                     } else {
-                        showUI(); // 原生函数：弹出频道列表
+                        showUI(); // 如果设置没开，单击弹出频道列表
                     }
                 }
                 lastClickTime = currentTime;
             }
         });
+
 
     }
 
@@ -269,7 +273,13 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.control.action.player.setOnClickListener(view -> onChoose());
         mBinding.control.action.decode.setOnClickListener(view -> onDecode());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
- 
+        mBinding.video.setOnTouchListener((view, event) -> mKeyDown.onTouchEvent(event));
+        mBinding.group.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
+            @Override
+            public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
+                if (mGroupAdapter.getItemCount() > 0) onChildSelected(child, mGroup = mGroupAdapter.get(position));
+            }
+        });
 
     }
 
@@ -1132,25 +1142,25 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         if (mBinding.linePanel == null) return;
 
-        // 1. 隐藏频道列表和控制栏，防止重叠
-        mBinding.recycler.setVisibility(View.GONE); 
+        // 1. 隐藏干扰 UI 
         hideControl();
         hideInfo();
+        mBinding.recycler.setVisibility(View.GONE); // 初始隐藏二级容器
 
-        // 2. 显示面板
+        // 2. 显示设置面板
         mBinding.linePanel.setVisibility(View.VISIBLE);
         mBinding.linePanel.bringToFront();
 
-        // 3. 强制获取 View (解决编译报错 cannot find symbol)
+        // 3. 获取 View (直接 findViewById 解决 symbol 报错)
         TextView tvTime = findViewById(R.id.panelTime);
         TextView tvSpeed = findViewById(R.id.panelNetSpeed);
         RecyclerView rvPanel = findViewById(R.id.panelRecycler);
 
-        // 设置时间
+        // 更新时间网速
         if (tvTime != null) tvTime.setText(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(new java.util.Date()));
         if (tvSpeed != null) com.fongmi.android.tv.utils.Traffic.setSpeed(tvSpeed);
 
-        // 4. 配置变窄的一级菜单
+        // 4. 配置一级菜单数据
         List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
         rvPanel.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
         rvPanel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -1158,11 +1168,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
                 TextView tv = new TextView(parent.getContext());
-                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(48)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
                 tv.setTextColor(android.graphics.Color.WHITE);
-                tv.setTextSize(14); // 字体调小一点适配窄菜单
+                tv.setTextSize(14); // 字体调小适配窄菜单
                 tv.setBackgroundResource(R.drawable.selector_item);
                 return new RecyclerView.ViewHolder(tv) {};
             }
@@ -1171,29 +1181,37 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 TextView tv = (TextView) holder.itemView;
                 tv.setText(mainItems.get(position));
+                
+                // 【核心】焦点变动时，左侧立即出现窄二级菜单
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
-                        // 弹出变窄的二级菜单
-                        showNarrowSubMenu(); 
+                        showSubMenu(); // 自定义函数：显示变窄的二级容器
                     }
+                });
+
+                // 点击时，焦点进入二级菜单
+                tv.setOnClickListener(v -> {
+                    mCurrentMenu = position;
+                    showSubMenu();
+                    mBinding.channel.requestFocus(); // 焦点跳向子列表
                 });
             }
             @Override
             public int getItemCount() { return mainItems.size(); }
         });
-
         rvPanel.requestFocus();
     }
 
-    // 新增：让二级菜单也变窄
-    private void showNarrowSubMenu() {
+    // 辅助方法：让二级容器(recycler)变窄并刷新
+    private void showSubMenu() {
         mBinding.recycler.setVisibility(View.VISIBLE);
         ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
-        params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); // 二级菜单宽度也设为160dp
+        params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); // 二级也设为窄条
         mBinding.recycler.setLayoutParams(params);
-        refreshLeftAdapter();
+        refreshLeftAdapter(); // 刷新二级内容
     }
+
 
 
     private void refreshLeftAdapter() {
