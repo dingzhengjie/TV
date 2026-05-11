@@ -103,6 +103,9 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     private Clock mClock;
     private View mFocus2;
     private int count;
+    private int mTimeout;
+    private boolean mBootLive;
+    private int mCurrentMenu = -1; // 记录右侧当前选中的大类索引
 
     public static void start(Context context) {
         context.startActivity(new Intent(context, LiveActivity.class).putExtra("empty", LiveConfig.isEmpty()));
@@ -174,6 +177,8 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         super.initView(savedInstanceState);
         mClock = Clock.create(mBinding.widget.clock);
         mKeyDown = CustomKeyDownLive.create(this);
+        initLiveSettings(); // 【关键】加载配置
+
         mObserveEpg = this::setEpg;
         mObserveUrl = this::start;
         mHides = new ArrayList<>();
@@ -1165,6 +1170,21 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         } else {
             if (isTaskRoot()) startActivity(new Intent(this, HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             super.onBackInvoked();
+        }
+    }
+    private void initLiveSettings() {
+        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+        this.mTimeout = sp.getInt("timeout", 15);
+        this.mBootLive = sp.getBoolean("boot_live", false);
+    }
+
+    private void updateSetting(String key, Object value) {
+        android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+        if (value instanceof Integer) sp.edit().putInt(key, (Integer) value).apply();
+        else if (value instanceof Boolean) sp.edit().putBoolean(key, (Boolean) value).apply();
+        initLiveSettings(); // 刷新内存变量
+        if (mBinding.recycler.getAdapter() != null) {
+            mBinding.recycler.getAdapter().notifyDataSetChanged(); // 刷新左侧二级菜单颜色
         }
     }
 
