@@ -50,8 +50,8 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
     public void onLongPress(MotionEvent e) {
         super.onLongPress(e);
         // 这里是核心：将手势分发给 Activity (Listener)
-        if (mListener != null) {
-            mListener.onLongPress();
+        if (listener != null) {
+            listener.onLongPress();
         }
     }
 
