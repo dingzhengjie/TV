@@ -1112,23 +1112,23 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         if (mBinding.linePanel == null) return;
 
-        // 1. 彻底隐藏所有可能干扰的原生 UI
-        // 必须显式隐藏 recycler，否则它会遮挡或并排显示在你的菜单边上
+        // 1. 隐藏所有干扰 UI 并彻底关闭原生频道列表
         hideControl();
         hideInfo();
         mBinding.recycler.setVisibility(View.GONE); 
 
-        // 2. 显示面板并确保层级在最前
+        // 2. 显示面板
         mBinding.linePanel.setVisibility(View.VISIBLE);
         mBinding.linePanel.bringToFront();
-        
-        // 3. 设置半透明背景（防止黑块，同时能看到视频背景）
         mBinding.linePanel.setBackgroundColor(android.graphics.Color.parseColor("#99000000"));
 
-        // 4. 定义一级菜单数据
+        // 3. 准备数据
         List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
 
-        // 5. 配置 RecyclerView 适配器
+        // 4. 【核心修复】必须设置 LayoutManager，否则内容不显示
+        mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+
+        // 5. 设置适配器
         mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
@@ -1137,9 +1137,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
+                tv.setClickable(true);
                 tv.setTextColor(android.graphics.Color.WHITE);
                 tv.setTextSize(16);
-                // 设置选择器，确保焦点选中时有高亮效果
+                // 确保 drawable 里有这个文件，否则背景会是空白
                 tv.setBackgroundResource(R.drawable.selector_item); 
                 return new RecyclerView.ViewHolder(tv) {};
             }
@@ -1149,11 +1150,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(mainItems.get(position));
             
-                // 焦点联动：右侧菜单滚动时，同步更新 mCurrentMenu 并刷新二级菜单
+                // 焦点联动
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
-                        refreshLeftAdapter(); // 此处调用你已实现的二级菜单刷新逻辑
+                        refreshLeftAdapter(); 
                     }
                 });
             }
@@ -1164,12 +1165,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             }
         });
 
-        // 6. 关键：强制将焦点移交给设置菜单
-        // 只有获取了焦点，遥控器按键才能生效
+        // 6. 强制刷新并请求焦点
+        mBinding.panelRecycler.getAdapter().notifyDataSetChanged();
         mBinding.panelRecycler.setFocusable(true);
         mBinding.panelRecycler.requestFocus();
     }
-
 
 
     private void refreshLeftAdapter() {
