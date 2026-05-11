@@ -1236,7 +1236,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     @Override
     public void onLongPress() {
         // 隐藏普通控制栏，弹出设置菜单
-        if (isVisible(mBinding.control.getRoot())) hideControl();
         onMenu();
     }
 
