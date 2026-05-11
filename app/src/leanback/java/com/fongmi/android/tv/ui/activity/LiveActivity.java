@@ -1107,67 +1107,72 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         showControl(getFocus2());
     }*/
-
+    
     @Override
     public void onMenu() {
         if (mBinding.linePanel == null) return;
-
-        // 1. 隐藏所有干扰 UI 并彻底关闭原生频道列表
+    
+        // 1. 初始化界面状态
         hideControl();
         hideInfo();
-        mBinding.recycler.setVisibility(View.GONE); 
-
-        // 2. 显示面板
         mBinding.linePanel.setVisibility(View.VISIBLE);
         mBinding.linePanel.bringToFront();
-        mBinding.linePanel.setBackgroundColor(android.graphics.Color.parseColor("#99000000"));
-
-        // 3. 准备数据
-        List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
-
-        // 4. 【核心修复】必须设置 LayoutManager，否则内容不显示
+        
+        // 2. 绑定点击空白消失逻辑 (对应 XML 新加的 panelBlank)
+        mBinding.panelBlank.setOnClickListener(v -> {
+            mBinding.linePanel.setVisibility(View.GONE);
+            hideUI(); // 同时关闭左侧可能开启的列表
+        });
+    
+        // 3. 右侧菜单配置
+        List<String> mainItems = Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+        
+        // 必须设置布局管理器
         mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-
-        // 5. 设置适配器
+        
         mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                android.widget.TextView tv = new android.widget.TextView(parent.getContext());
-                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
-                tv.setGravity(android.view.Gravity.CENTER);
+                TextView tv = new TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, ResUtil.dp2px(48)));
+                tv.setGravity(Gravity.CENTER);
                 tv.setFocusable(true);
-                tv.setClickable(true);
-                tv.setTextColor(android.graphics.Color.WHITE);
-                tv.setTextSize(16);
-                // 确保 drawable 里有这个文件，否则背景会是空白
-                tv.setBackgroundResource(R.drawable.selector_item); 
+                tv.setClickable(true); // 开启点击
+                tv.setTextColor(Color.WHITE);
+                tv.setBackgroundResource(R.drawable.selector_item);
                 return new RecyclerView.ViewHolder(tv) {};
             }
-
+    
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                android.widget.TextView tv = (android.widget.TextView) holder.itemView;
+                TextView tv = (TextView) holder.itemView;
                 tv.setText(mainItems.get(position));
             
-                // 焦点联动
+                // 焦点联动：滑动即显示
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
+                        // 核心：必须显式让左侧容器可见，否则二级菜单刷新了也看不见
+                        mBinding.recycler.setVisibility(View.VISIBLE); 
                         refreshLeftAdapter(); 
                     }
                 });
+    
+                // 点击联动：点击也刷新并把焦点移过去
+                tv.setOnClickListener(v -> {
+                    mCurrentMenu = position;
+                    mBinding.recycler.setVisibility(View.VISIBLE);
+                    refreshLeftAdapter();
+                    mBinding.channel.requestFocus(); // 焦点移向子菜单
+                });
             }
-
+    
             @Override
-            public int getItemCount() {
-                return mainItems.size();
-            }
+            public int getItemCount() { return mainItems.size(); }
         });
-
-        // 6. 强制刷新并请求焦点
-        mBinding.panelRecycler.getAdapter().notifyDataSetChanged();
-        mBinding.panelRecycler.setFocusable(true);
+    
+        // 4. 激活焦点
         mBinding.panelRecycler.requestFocus();
     }
 
