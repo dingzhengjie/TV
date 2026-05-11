@@ -89,14 +89,23 @@
 		    android:id="@+id/linePanel"
 		    android:layout_width="match_parent"
 		    android:layout_height="match_parent"
-		    android:gravity="right"
 		    android:orientation="horizontal"
+		    android:background="@android:color/transparent"
 		    android:visibility="gone">
+		
+		    <View
+		        android:id="@+id/panelBlank"
+		        android:layout_width="0dp"
+		        android:layout_height="match_parent"
+		        android:layout_weight="1"
+		        android:clickable="true"
+		        android:focusable="false" />
 		
 		    <LinearLayout
 		        android:layout_width="300dp"
 		        android:layout_height="match_parent"
 		        android:background="#E6000000"
+		        android:gravity="center_horizontal"
 		        android:orientation="vertical"
 		        android:padding="15dp">
 		
@@ -117,11 +126,7 @@
 		                android:textColor="#03DAC5" />
 		        </LinearLayout>
 		
-		        <View 
-		            android:layout_width="match_parent" 
-		            android:layout_height="1dp" 
-		            android:background="#33FFFFFF" 
-		            android:layout_marginVertical="10dp"/>
+		        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#33FFFFFF" android:layout_marginVertical="10dp"/>
 		
 		        <androidx.recyclerview.widget.RecyclerView
 		            android:id="@+id/panelRecycler"
@@ -130,7 +135,7 @@
 		            android:focusable="true" />
 		    </LinearLayout>
 		</LinearLayout>
-		
+
 
 </FrameLayout>
 
