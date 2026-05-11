@@ -1248,9 +1248,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
         if (value instanceof Integer) sp.edit().putInt(key, (Integer) value).apply();
         else if (value instanceof Boolean) sp.edit().putBoolean(key, (Boolean) value).apply();
-        initLiveSettings(); // 刷新内存变量
-        if (mBinding.recycler.getAdapter() != null) {
-            mBinding.recycler.getAdapter().notifyDataSetChanged(); // 刷新左侧二级菜单颜色
+        initLiveSettings(); 
+        
+        // 【修改点】将 recycler 改为 channel
+        if (mBinding.channel.getAdapter() != null) {
+            mBinding.channel.getAdapter().notifyDataSetChanged(); 
         }
     }
 
