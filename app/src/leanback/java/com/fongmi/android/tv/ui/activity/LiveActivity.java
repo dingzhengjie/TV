@@ -1126,6 +1126,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 public int getItemCount() { return mainItems.size(); }
             });
             mBinding.panelRecycler.requestFocus();
+            // 在 onMenu 方法末尾添加
+            mBinding.linePanel.getRootView().setBackgroundColor(Color.TRANSPARENT);
+            // 确保右侧面板本身的背景是带透明度的阴影，而不是实黑
+            mBinding.linePanel.setBackgroundColor(Color.parseColor("#00000000")); 
+
         }
     }
 
