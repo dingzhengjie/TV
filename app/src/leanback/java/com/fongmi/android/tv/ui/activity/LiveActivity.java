@@ -1156,61 +1156,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.panelRecycler.requestFocus();
     }
 
-private void refreshLeftAdapter() {
-    List<String> subItems = new ArrayList<>();
-    if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
-    else if (mCurrentMenu == 1) subItems.addAll(Arrays.asList("硬件解码", "软件解码", "原生解码"));
-    else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
-    else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
-
-    // 注意：左侧列表 ID 确认为 mBinding.channel
-    mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-        @NonNull
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup vg, int viewType) {
-            TextView tv = new TextView(vg.getContext());
-            tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
-            tv.setGravity(android.view.Gravity.CENTER);
-            tv.setFocusable(true);
-            tv.setBackgroundResource(R.drawable.selector_item);
-            return new RecyclerView.ViewHolder(tv) {};
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            TextView tv = (TextView) holder.itemView;
-            String text = subItems.get(position);
-            tv.setText(text);
-
-            // 实时从配置中获取当前选中的颜色
-            android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
-            boolean isSelected = false;
-            if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
-            else if (mCurrentMenu == 3) {
-                boolean boot = sp.getBoolean("boot_live", false);
-                if ((boot && text.contains("开")) || (!boot && text.contains("关"))) isSelected = true;
-            }
-
-            tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
-
-            tv.setOnClickListener(v -> {
-                if (mCurrentMenu == 0) onScale();
-                else if (mCurrentMenu == 1) onDecode();
-                else if (mCurrentMenu == 2) {
-                    int[] vals = {5, 15, 30, 60};
-                    updateSetting("timeout", vals[position]);
-                } else if (mCurrentMenu == 3) {
-                    updateSetting("boot_live", position == 1);
-                }
-                notifyDataSetChanged(); // 实时更新颜色
-            });
-        }
-        @Override
-        public int getItemCount() { return subItems.size(); }
-    });
-}
-
-
     private void refreshLeftAdapter() {
         List<String> subItems = new ArrayList<>();
         if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
@@ -1218,11 +1163,12 @@ private void refreshLeftAdapter() {
         else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
         else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
 
+        // 注意：左侧列表 ID 确认为 mBinding.channel
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup vg, int viewType) {
-                TextView tv = new TextView(vg.getContext()); // 这里的 vg 对应下面的参数名
+                TextView tv = new TextView(vg.getContext());
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
@@ -1236,7 +1182,7 @@ private void refreshLeftAdapter() {
                 String text = subItems.get(position);
                 tv.setText(text);
 
-                // 获取实时配置高亮
+                // 实时从配置中获取当前选中的颜色
                 android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
                 boolean isSelected = false;
                 if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
@@ -1246,9 +1192,9 @@ private void refreshLeftAdapter() {
                 }
 
                 tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
-                
+
                 tv.setOnClickListener(v -> {
-                    if (mCurrentMenu == 0) onScale(); 
+                    if (mCurrentMenu == 0) onScale();
                     else if (mCurrentMenu == 1) onDecode();
                     else if (mCurrentMenu == 2) {
                         int[] vals = {5, 15, 30, 60};
@@ -1256,15 +1202,11 @@ private void refreshLeftAdapter() {
                     } else if (mCurrentMenu == 3) {
                         updateSetting("boot_live", position == 1);
                     }
-                    // 点击后通知当前适配器刷新颜色
-                    notifyDataSetChanged(); 
+                    notifyDataSetChanged(); // 实时更新颜色
                 });
             }
-
             @Override
-            public int getItemCount() {
-                return subItems.size();
-            }
+            public int getItemCount() { return subItems.size(); }
         });
     }
 
