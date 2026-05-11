@@ -84,18 +84,14 @@
             tools:listitem="@layout/adapter_epg_data" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
-    <LinearLayout
-        android:id="@+id/linePanel"
-        android:layout_width="260dp"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="20dp"
-        android:background="#CC000000"
-        android:orientation="vertical"
-        android:padding="15dp"
-        android:visibility="gone">
-
+		<LinearLayout
+		    android:id="@+id/linePanel"
+		    android:layout_width="match_parent"
+		    android:layout_height="match_parent"
+		    android:background="@android:color/transparent" 
+		    android:gravity="right"
+		    android:visibility="gone">
+    
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
