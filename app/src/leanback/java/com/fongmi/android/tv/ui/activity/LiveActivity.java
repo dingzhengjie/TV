@@ -1056,26 +1056,27 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         else prevChannel();
     }
 
-    /*@Override
+    @Override
     public void onKeyDown() {
         if (Setting.isInvert()) prevChannel();
         else nextChannel();
-    }*/
+    }
+
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // 1. 监听遥控器菜单键
+        // 1. 物理菜单键直接拦截
         if (keyCode == KeyEvent.KEYCODE_MENU) {
-            onMenu(); // 调用显示右侧菜单
+            onMenu();
             return true;
         }
+        // 2. 核心：如果长按确定键，跳转到 onMenu 而不是弹出列表
+        if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+            if (event.isLongPress()) {
+                onMenu();
+                return true;
+            }
+        }
         return super.onKeyDown(keyCode, event);
-    }
-    // 修复错误 1：实现接口要求的方法
-    @Override
-    public void onKeyDown() {
-        // 这里通常是原本换台的逻辑
-        if (com.fongmi.android.tv.Setting.isInvert()) prevChannel();
-        else nextChannel();
     }
 
     
