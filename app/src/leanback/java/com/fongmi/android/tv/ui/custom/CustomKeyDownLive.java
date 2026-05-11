@@ -76,6 +76,9 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
             listener.onKeyCenter();
         } else if (KeyUtil.isMenuKey(event) || event.isLongPress() && KeyUtil.isEnterKey(event)) {
             listener.onMenu();
+        } else if (event.isLongPress() && KeyUtil.isEnterKey(event)) {
+            // 核心：遥控器长按 OK 键，也指向 onMenu，而不是 onKeyCenter
+            listener.onMenu();
         }
     }
 
