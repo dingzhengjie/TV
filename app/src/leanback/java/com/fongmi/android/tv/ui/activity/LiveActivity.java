@@ -1056,12 +1056,32 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         else prevChannel();
     }
 
-    @Override
+    /*@Override
     public void onKeyDown() {
         if (Setting.isInvert()) prevChannel();
         else nextChannel();
+    }*/
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // 1. 监听遥控器菜单键
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            onMenu(); // 调用显示右侧菜单
+            return true;
+        }
+    
+        // 2. 这里可以保留你之前的逻辑（如果需要）
+    
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (Setting.isInvert()) prevChannel();
+            else nextChannel();
+            return true;
+        }
+    
+
+        return super.onKeyDown(keyCode, event);
     }
 
+    
     @Override
     public void onKeyLeft(long time) {
         if (player().isLive()) prevLine();
@@ -1087,52 +1107,109 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
     @Override
     public void onMenu() {
-        if (isVisible(mBinding.control.getRoot())) hideControl();
-        
-        if (mBinding.linePanel != null) {
-            mBinding.linePanel.setVisibility(View.VISIBLE);
-            showUI(); // 确保左侧区域可见
-            
-            // 右侧一级菜单项
-            List<String> mainItems = Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
-            
-            mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-                @NonNull
-                @Override
-                public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                    TextView tv = new TextView(parent.getContext());
-                    tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
-                    tv.setGravity(android.view.Gravity.CENTER);
-                    tv.setFocusable(true);
-                    tv.setTextColor(android.graphics.Color.WHITE);
-                    tv.setBackgroundResource(R.drawable.selector_item);
-                    return new RecyclerView.ViewHolder(tv) {};
-                }
+        if (mBinding.linePanel == null) return;
 
-                @Override
-                public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                    TextView tv = (TextView) holder.itemView;
-                    tv.setText(mainItems.get(position));
-                    
-                    // 当右侧项获得焦点时，左侧列表立刻刷新为对应的二级选项
-                    tv.setOnFocusChangeListener((v, hasFocus) -> {
-                        if (hasFocus) {
-                            mCurrentMenu = position; 
-                            refreshLeftAdapter(); 
-                        }
-                    });
-                }
-                @Override
-                public int getItemCount() { return mainItems.size(); }
-            });
-            mBinding.panelRecycler.requestFocus();
-            // 在 onMenu 方法末尾添加
-            mBinding.linePanel.getRootView().setBackgroundColor(Color.TRANSPARENT);
-            // 确保右侧面板本身的背景是带透明度的阴影，而不是实黑
-            mBinding.linePanel.setBackgroundColor(Color.parseColor("#00000000")); 
+        // 1. 隐藏干扰 UI
+        hideControl();
+        hideInfo();
 
-        }
+        // 2. 显示面板并确保背景透明（解决黑块）
+        mBinding.linePanel.setVisibility(View.VISIBLE);
+        mBinding.linePanel.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        showUI(); // 确保左侧列表容器可见
+
+        // 3. 右侧一级菜单数据
+        List<String> mainItems = Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+
+        mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            @NonNull
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                TextView tv = new TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+                tv.setGravity(android.view.Gravity.CENTER);
+                tv.setFocusable(true);
+                tv.setTextColor(android.graphics.Color.WHITE);
+                tv.setBackgroundResource(R.drawable.selector_item);
+                return new RecyclerView.ViewHolder(tv) {};
+            }
+
+            @Override
+            public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                TextView tv = (TextView) holder.itemView;
+                tv.setText(mainItems.get(position));
+            
+                // 焦点联动：右侧获得焦点时，左侧 channel 列表自动刷新
+                tv.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (hasFocus) {
+                        mCurrentMenu = position;
+                        refreshLeftAdapter(); 
+                    }
+                });
+            }
+
+            @Override
+            public int getItemCount() { return mainItems.size(); }
+        });
+
+        // 4. 强制焦点移向右侧
+        mBinding.panelRecycler.requestFocus();
     }
+
+private void refreshLeftAdapter() {
+    List<String> subItems = new ArrayList<>();
+    if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
+    else if (mCurrentMenu == 1) subItems.addAll(Arrays.asList("硬件解码", "软件解码", "原生解码"));
+    else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
+    else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
+
+    // 注意：左侧列表 ID 确认为 mBinding.channel
+    mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        @NonNull
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup vg, int viewType) {
+            TextView tv = new TextView(vg.getContext());
+            tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+            tv.setGravity(android.view.Gravity.CENTER);
+            tv.setFocusable(true);
+            tv.setBackgroundResource(R.drawable.selector_item);
+            return new RecyclerView.ViewHolder(tv) {};
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+            TextView tv = (TextView) holder.itemView;
+            String text = subItems.get(position);
+            tv.setText(text);
+
+            // 实时从配置中获取当前选中的颜色
+            android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
+            boolean isSelected = false;
+            if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
+            else if (mCurrentMenu == 3) {
+                boolean boot = sp.getBoolean("boot_live", false);
+                if ((boot && text.contains("开")) || (!boot && text.contains("关"))) isSelected = true;
+            }
+
+            tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
+
+            tv.setOnClickListener(v -> {
+                if (mCurrentMenu == 0) onScale();
+                else if (mCurrentMenu == 1) onDecode();
+                else if (mCurrentMenu == 2) {
+                    int[] vals = {5, 15, 30, 60};
+                    updateSetting("timeout", vals[position]);
+                } else if (mCurrentMenu == 3) {
+                    updateSetting("boot_live", position == 1);
+                }
+                notifyDataSetChanged(); // 实时更新颜色
+            });
+        }
+        @Override
+        public int getItemCount() { return subItems.size(); }
+    });
+}
+
 
     private void refreshLeftAdapter() {
         List<String> subItems = new ArrayList<>();
@@ -1216,6 +1293,12 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         if (isVisible(mBinding.recycler)) hideUI();
         else if (isVisible(mBinding.control.getRoot())) hideControl();
         else onMenu();
+    }
+    @Override
+    public void onLongPress() {
+        // 隐藏普通控制栏，弹出设置菜单
+        if (isVisible(mBinding.control.getRoot())) hideControl();
+        onMenu();
     }
 
     @Override
