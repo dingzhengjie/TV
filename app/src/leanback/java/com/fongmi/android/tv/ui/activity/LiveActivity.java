@@ -211,10 +211,35 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         setRecyclerView();
         setVideoView(); // 执行完这个，player() 才可能不为空
         setViewModel(); // 执行完这个，mChannel 才会有数据
-        // 直接给根视图绑定长按，不经过手势库
+        /*// 直接给根视图绑定长按，不经过手势库
         mBinding.getRoot().setOnLongClickListener(v -> {
             onMenu();
             return true; // 返回 true 表示消耗掉这个事件，不触发其他动作
+        });
+        */
+        // 点击左侧透明区域关闭设置菜单
+        mBinding.panelBlank.setOnClickListener(v -> mBinding.linePanel.setVisibility(View.GONE));
+
+        // 修复屏幕点击：单击弹频道列表，双击弹设置菜单
+        mBinding.video.setOnClickListener(new View.OnClickListener() {
+            private long lastClickTime = 0;
+            @Override
+            public void onClick(View v) {
+                long currentTime = System.currentTimeMillis();
+                if (currentTime - lastClickTime < 350) {
+                    onMenu(); // 双击弹出右侧设置菜单
+                } else {
+                    // 单击逻辑
+                    if (isVisible(mBinding.linePanel)) {
+                        mBinding.linePanel.setVisibility(View.GONE);
+                    } else if (isVisible(mBinding.recycler)) {
+                        hideUI();
+                    } else {
+                        showUI(); // 原生函数：弹出频道列表
+                    }
+                }
+                lastClickTime = currentTime;
+            }
         });
 
     }
@@ -1107,74 +1132,75 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         showControl(getFocus2());
     }*/
-    
+
     @Override
     public void onMenu() {
         if (mBinding.linePanel == null) return;
-    
-        // 1. 初始化界面状态
+
+        // 1. 初始状态清理
         hideControl();
         hideInfo();
+        // 彻底关闭原生 UI
+        mBinding.recycler.setVisibility(View.GONE); 
+
+        // 2. 显示面板
         mBinding.linePanel.setVisibility(View.VISIBLE);
         mBinding.linePanel.bringToFront();
-        
-        // 2. 绑定点击空白消失逻辑 (对应 XML 新加的 panelBlank)
-        mBinding.panelBlank.setOnClickListener(v -> {
-            mBinding.linePanel.setVisibility(View.GONE);
-            hideUI(); // 同时关闭左侧可能开启的列表
-        });
-    
-        // 3. 右侧菜单配置
-        List<String> mainItems = Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
-        
-        // 必须设置布局管理器
+
+        // 3. 准备数据
+        List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+
+        // 4. 配置 RecyclerView
         mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-        
         mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                TextView tv = new TextView(parent.getContext());
-                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, ResUtil.dp2px(48)));
-                tv.setGravity(Gravity.CENTER);
+                android.widget.TextView tv = new android.widget.TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+                tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
-                tv.setClickable(true); // 开启点击
-                tv.setTextColor(Color.WHITE);
-                tv.setBackgroundResource(R.drawable.selector_item);
+                tv.setClickable(true);
+                tv.setTextColor(android.graphics.Color.WHITE);
+                tv.setTextSize(15);
+                tv.setBackgroundResource(R.drawable.selector_item); 
                 return new RecyclerView.ViewHolder(tv) {};
             }
-    
+
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                TextView tv = (TextView) holder.itemView;
+                android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(mainItems.get(position));
             
-                // 焦点联动：滑动即显示
+                // 焦点联动：滑动时立即显示对应的二级菜单
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
-                        // 核心：必须显式让左侧容器可见，否则二级菜单刷新了也看不见
+                        // 关键：必须让左侧容器可见，否则二级菜单刷新了也看不见
                         mBinding.recycler.setVisibility(View.VISIBLE); 
                         refreshLeftAdapter(); 
                     }
                 });
-    
-                // 点击联动：点击也刷新并把焦点移过去
+
+                // 点击联动：点击一级菜单，焦点强行跳到二级菜单，解决焦点丢失
                 tv.setOnClickListener(v -> {
                     mCurrentMenu = position;
                     mBinding.recycler.setVisibility(View.VISIBLE);
                     refreshLeftAdapter();
-                    mBinding.channel.requestFocus(); // 焦点移向子菜单
+                    if (mBinding.channel.getChildCount() > 0) {
+                        mBinding.channel.requestFocus();
+                    }
                 });
             }
-    
+
             @Override
             public int getItemCount() { return mainItems.size(); }
         });
-    
-        // 4. 激活焦点
+
+        // 5. 启动焦点
         mBinding.panelRecycler.requestFocus();
     }
+
 
 
     private void refreshLeftAdapter() {
