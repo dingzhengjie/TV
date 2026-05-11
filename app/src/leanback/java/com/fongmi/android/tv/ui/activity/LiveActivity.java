@@ -269,23 +269,26 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.control.action.player.setOnClickListener(view -> onChoose());
         mBinding.control.action.decode.setOnClickListener(view -> onDecode());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
-                // 点击空白处关闭设置菜单
-        mBinding.panelBlank.setOnClickListener(v -> mBinding.linePanel.setVisibility(View.GONE));
+        
+                // 点击左侧关闭所有菜单
+        findViewById(R.id.panelBlank).setOnClickListener(v -> {
+            mBinding.linePanel.setVisibility(View.GONE);
+            mBinding.recycler.setVisibility(View.GONE);
+        });
 
+        // 屏幕点击逻辑
         mBinding.video.setOnClickListener(new View.OnClickListener() {
             private long lastClickTime = 0;
             @Override
             public void onClick(View v) {
                 long currentTime = System.currentTimeMillis();
-                if (currentTime - lastClickTime < 300) {
-                    onMenu(); // 双击弹设置菜单
+                if (currentTime - lastClickTime < 350) {
+                    onMenu(); // 双击弹设置
                 } else {
-                    // 单击逻辑
-                    if (isVisible(mBinding.linePanel)) {
-                        mBinding.linePanel.setVisibility(View.GONE);
+                    if (!isVisible(mBinding.linePanel)) {
+                        showUI(); // 单击弹频道列表
                     } else {
-                        // 如果菜单没开，则弹出原生频道列表
-                        showUI(); 
+                        mBinding.linePanel.setVisibility(View.GONE);
                     }
                 }
                 lastClickTime = currentTime;
@@ -1153,70 +1156,68 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         if (mBinding.linePanel == null) return;
 
-        // 1. 初始状态清理
+        // 1. 隐藏频道列表和控制栏，防止重叠
+        mBinding.recycler.setVisibility(View.GONE); 
         hideControl();
         hideInfo();
-        // 彻底关闭原生 UI
-        mBinding.recycler.setVisibility(View.GONE); 
 
         // 2. 显示面板
         mBinding.linePanel.setVisibility(View.VISIBLE);
         mBinding.linePanel.bringToFront();
 
-        // 3. 准备数据
-        List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+        // 3. 强制获取 View (解决编译报错 cannot find symbol)
+        TextView tvTime = findViewById(R.id.panelTime);
+        TextView tvSpeed = findViewById(R.id.panelNetSpeed);
+        RecyclerView rvPanel = findViewById(R.id.panelRecycler);
 
-        // 4. 配置 RecyclerView
-        mBinding.panelRecycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-        mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        // 设置时间
+        if (tvTime != null) tvTime.setText(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(new java.util.Date()));
+        if (tvSpeed != null) com.fongmi.android.tv.utils.Traffic.setSpeed(tvSpeed);
+
+        // 4. 配置变窄的一级菜单
+        List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+        rvPanel.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+        rvPanel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                android.widget.TextView tv = new android.widget.TextView(parent.getContext());
+                TextView tv = new TextView(parent.getContext());
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
-                tv.setClickable(true);
                 tv.setTextColor(android.graphics.Color.WHITE);
-                tv.setTextSize(15);
-                tv.setBackgroundResource(R.drawable.selector_item); 
+                tv.setTextSize(14); // 字体调小一点适配窄菜单
+                tv.setBackgroundResource(R.drawable.selector_item);
                 return new RecyclerView.ViewHolder(tv) {};
             }
 
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                android.widget.TextView tv = (android.widget.TextView) holder.itemView;
+                TextView tv = (TextView) holder.itemView;
                 tv.setText(mainItems.get(position));
-            
-                // 焦点联动：滑动时立即显示对应的二级菜单
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
-                        // 关键：必须让左侧容器可见，否则二级菜单刷新了也看不见
-                        mBinding.recycler.setVisibility(View.VISIBLE); 
-                        refreshLeftAdapter(); 
-                    }
-                });
-
-                // 点击联动：点击一级菜单，焦点强行跳到二级菜单，解决焦点丢失
-                tv.setOnClickListener(v -> {
-                    mCurrentMenu = position;
-                    mBinding.recycler.setVisibility(View.VISIBLE);
-                    refreshLeftAdapter();
-                    if (mBinding.channel.getChildCount() > 0) {
-                        mBinding.channel.requestFocus();
+                        // 弹出变窄的二级菜单
+                        showNarrowSubMenu(); 
                     }
                 });
             }
-
             @Override
             public int getItemCount() { return mainItems.size(); }
         });
 
-        // 5. 启动焦点
-        mBinding.panelRecycler.requestFocus();
+        rvPanel.requestFocus();
     }
 
+    // 新增：让二级菜单也变窄
+    private void showNarrowSubMenu() {
+        mBinding.recycler.setVisibility(View.VISIBLE);
+        ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
+        params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); // 二级菜单宽度也设为160dp
+        mBinding.recycler.setLayoutParams(params);
+        refreshLeftAdapter();
+    }
 
 
     private void refreshLeftAdapter() {
