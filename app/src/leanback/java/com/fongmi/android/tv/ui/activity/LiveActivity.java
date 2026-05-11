@@ -79,6 +79,11 @@ import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Arrays;
+import android.widget.TextView;
+import android.view.Gravity;
+import android.graphics.Color;
+
 
 public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnClickListener, ChannelAdapter.OnClickListener, EpgDataAdapter.OnClickListener, CustomKeyDownLive.Listener, CustomLiveListView.Callback, TrackDialog.Listener, PassCallback, ConfigCallback, LiveCallback {
 
@@ -1123,8 +1128,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             mBinding.panelRecycler.requestFocus();
         }
     }
-
-    // 刷新左侧列表为二级菜单
     private void refreshLeftAdapter() {
         List<String> subItems = new ArrayList<>();
         if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
@@ -1132,15 +1135,17 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
         else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
 
-        mBinding.recycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        // 注意：这里要把 mBinding.recycler 替换为你 XML 里真实的 RecyclerView ID
+        // 假设真实的 ID 是 mBinding.channel
+        mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
                 TextView tv = new TextView(parent.getContext());
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
-                tv.setGravity(android.view.Gravity.CENTER);
+                tv.setGravity(Gravity.CENTER);
                 tv.setFocusable(true);
-                tv.setBackgroundResource(R.drawable.selector_item);
+                tv.setBackgroundResource(com.fongmi.android.tv.R.drawable.selector_item);
                 return new RecyclerView.ViewHolder(tv) {};
             }
 
@@ -1150,7 +1155,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 String text = subItems.get(position);
                 tv.setText(text);
 
-                // --- 实时高亮逻辑 ---
                 android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
                 boolean isSelected = false;
                 if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
@@ -1159,24 +1163,25 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                     if ((boot && text.contains("开")) || (!boot && text.contains("关"))) isSelected = true;
                 }
 
-                tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
+                tv.setTextColor(isSelected ? Color.parseColor("#448AFF") : Color.WHITE);
                 
                 tv.setOnClickListener(v -> {
-                    if (mCurrentMenu == 0) onScale(position);
-                    else if (mCurrentMenu == 1) onDecode(position);
+                    if (mCurrentMenu == 0) onScale(); 
+                    else if (mCurrentMenu == 1) onDecode();
                     else if (mCurrentMenu == 2) {
                         int[] vals = {5, 15, 30, 60};
                         updateSetting("timeout", vals[position]);
                     } else if (mCurrentMenu == 3) {
                         updateSetting("boot_live", position == 1);
                     }
+                    // 刷新当前列表颜色
+                    mBinding.channel.getAdapter().notifyDataSetChanged();
                 });
             }
             @Override
             public int getItemCount() { return subItems.size(); }
         });
     }
-
 
     private void onPanelItemClick(int position) {
         switch (position) {
