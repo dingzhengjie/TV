@@ -1112,50 +1112,64 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         if (mBinding.linePanel == null) return;
 
-        // 1. 彻底隐藏所有原生的直播界面组件（频道列表、分类、控制栏）
+        // 1. 彻底隐藏所有可能干扰的原生 UI
+        // 必须显式隐藏 recycler，否则它会遮挡或并排显示在你的菜单边上
         hideControl();
         hideInfo();
-        // 关键点：Fongmi原版的 showUI() 会让列表出来，所以我们要反其道而行之
         mBinding.recycler.setVisibility(View.GONE); 
 
-        // 2. 显示你的自定义设置面板
+        // 2. 显示面板并确保层级在最前
         mBinding.linePanel.setVisibility(View.VISIBLE);
-        mBinding.linePanel.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        mBinding.linePanel.bringToFront();
+        
+        // 3. 设置半透明背景（防止黑块，同时能看到视频背景）
+        mBinding.linePanel.setBackgroundColor(android.graphics.Color.parseColor("#99000000"));
 
-        // 3. 绑定右侧一级菜单（代码保持你之前的逻辑）
-        List<String> mainItems = Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+        // 4. 定义一级菜单数据
+        List<String> mainItems = java.util.Arrays.asList("画面比例", "播放解码", "超时换源", "开机自启");
+
+        // 5. 配置 RecyclerView 适配器
         mBinding.panelRecycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-        @NonNull
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            TextView tv = new TextView(parent.getContext());
-            tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
-            tv.setGravity(android.view.Gravity.CENTER);
-            tv.setFocusable(true);
-            tv.setTextColor(android.graphics.Color.WHITE);
-            tv.setBackgroundResource(R.drawable.selector_item); // 确保有焦点颜色变化
-            return new RecyclerView.ViewHolder(tv) {};
-        }
+            @NonNull
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                android.widget.TextView tv = new android.widget.TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+                tv.setGravity(android.view.Gravity.CENTER);
+                tv.setFocusable(true);
+                tv.setTextColor(android.graphics.Color.WHITE);
+                tv.setTextSize(16);
+                // 设置选择器，确保焦点选中时有高亮效果
+                tv.setBackgroundResource(R.drawable.selector_item); 
+                return new RecyclerView.ViewHolder(tv) {};
+            }
 
-        @Override
-        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            TextView tv = (TextView) holder.itemView;
-            tv.setText(mainItems.get(position));
-            tv.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus) {
-                    mCurrentMenu = position;
-                    refreshLeftAdapter(); // 刷新左侧二级菜单
-                }
-            });
-        }
-        @Override
-        public int getItemCount() { return mainItems.size(); }
+            @Override
+            public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                android.widget.TextView tv = (android.widget.TextView) holder.itemView;
+                tv.setText(mainItems.get(position));
+            
+                // 焦点联动：右侧菜单滚动时，同步更新 mCurrentMenu 并刷新二级菜单
+                tv.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (hasFocus) {
+                        mCurrentMenu = position;
+                        refreshLeftAdapter(); // 此处调用你已实现的二级菜单刷新逻辑
+                    }
+                });
+            }
+
+            @Override
+            public int getItemCount() {
+                return mainItems.size();
+            }
         });
 
-        // 4. 强制焦点移向右侧设置菜单
+        // 6. 关键：强制将焦点移交给设置菜单
+        // 只有获取了焦点，遥控器按键才能生效
         mBinding.panelRecycler.setFocusable(true);
         mBinding.panelRecycler.requestFocus();
     }
+
 
 
     private void refreshLeftAdapter() {
