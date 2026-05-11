@@ -81,11 +81,19 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         App.post(runnable, 2000);
     }
 
-    @Override
+    /*@Override
     public boolean onDoubleTap(@NonNull MotionEvent e) {
         if (listener.dispatch(false)) listener.onDoubleTap();
         return true;
+    }*/
+    // 位置：CustomKeyDownLive.java 约 110 行附近
+    @Override
+    public boolean onDoubleTap(@NonNull MotionEvent e) {
+        // 删掉原有的 dispatch 判断，直接执行 onMenu
+        listener.onMenu(); 
+        return true;
     }
+
     // 在 CustomKeyDownLive.java 约 100-150 行附近
     @Override
     public void onLongPress(MotionEvent e) {
