@@ -157,7 +157,21 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     protected void onServiceConnected() {
         mBinding.control.action.speed.setText(player().getSpeedText());
         mBinding.control.action.decode.setText(player().getDecodeText());
-        
+        super.onServiceConnected(); 
+        if (player() != null && player().getPlayer() != null) {
+            player().getPlayer().addListener(new Player.Listener() {
+                @Override
+                public void onPlayerError(@NonNull PlaybackException error) {
+                    if (mChannel == null) return;
+                    // 自动换线
+                    if (!mChannel.isLast()) nextLine(false);
+                    else nextChannel();
+                }
+            });
+        }
+        checkLive();
+    }
+/*
         // 在这里挂载监听器，100% 不会报空指针
         if (player().getPlayer() != null) {
             player().getPlayer().addListener(new androidx.media3.common.Player.Listener() {
@@ -170,7 +184,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             });
         }
         checkLive();
-    }
+    }*/
 
     @Override
     protected void initView(Bundle savedInstanceState) {
@@ -1207,6 +1221,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         
         if (isVisible(mBinding.linePanel)) {
             mBinding.linePanel.setVisibility(View.GONE);
+            setRecyclerView(); // 【关键】关闭面板时，将左侧列表恢复为电视频道/线路
         } else if (isVisible(mBinding.control.getRoot())) {
             hideControl();
         } else if (isVisible(mBinding.widget.bottom)) {
