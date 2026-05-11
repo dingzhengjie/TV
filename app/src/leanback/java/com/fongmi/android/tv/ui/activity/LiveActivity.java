@@ -269,13 +269,29 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.control.action.player.setOnClickListener(view -> onChoose());
         mBinding.control.action.decode.setOnClickListener(view -> onDecode());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
-        mBinding.video.setOnTouchListener((view, event) -> mKeyDown.onTouchEvent(event));
-        mBinding.group.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
+                // 点击空白处关闭设置菜单
+        mBinding.panelBlank.setOnClickListener(v -> mBinding.linePanel.setVisibility(View.GONE));
+
+        mBinding.video.setOnClickListener(new View.OnClickListener() {
+            private long lastClickTime = 0;
             @Override
-            public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                if (mGroupAdapter.getItemCount() > 0) onChildSelected(child, mGroup = mGroupAdapter.get(position));
+            public void onClick(View v) {
+                long currentTime = System.currentTimeMillis();
+                if (currentTime - lastClickTime < 300) {
+                    onMenu(); // 双击弹设置菜单
+                } else {
+                    // 单击逻辑
+                    if (isVisible(mBinding.linePanel)) {
+                        mBinding.linePanel.setVisibility(View.GONE);
+                    } else {
+                        // 如果菜单没开，则弹出原生频道列表
+                        showUI(); 
+                    }
+                }
+                lastClickTime = currentTime;
             }
         });
+
     }
 
     private void setRecyclerView() {
@@ -1240,17 +1256,19 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
                 tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
 
+                // 在 refreshLeftAdapter 的适配器 onClick 内部
                 tv.setOnClickListener(v -> {
+                    // 1. 执行具体的设置变更
                     if (mCurrentMenu == 0) onScale();
                     else if (mCurrentMenu == 1) onDecode();
-                    else if (mCurrentMenu == 2) {
-                        int[] vals = {5, 15, 30, 60};
-                        updateSetting("timeout", vals[position]);
-                    } else if (mCurrentMenu == 3) {
-                        updateSetting("boot_live", position == 1);
-                    }
-                    notifyDataSetChanged(); // 实时更新颜色
+                    
+                    // 2. 核心：强制刷新当前适配器，清除之前的选中状态
+                    mBinding.channel.getAdapter().notifyDataSetChanged(); 
+                    
+                    // 3. 自动关闭设置面板（可选，提升体验）
+                    // mBinding.linePanel.setVisibility(View.GONE);
                 });
+
             }
             @Override
             public int getItemCount() { return subItems.size(); }
