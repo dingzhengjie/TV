@@ -45,15 +45,7 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         check(event);
         return true;
     }
-    // 在 CustomKeyDownLive.java 约 100-150 行附近
-    @Override
-    public void onLongPress(MotionEvent e) {
-        super.onLongPress(e);
-        // 这里是核心：将手势分发给 Activity (Listener)
-        if (listener != null) {
-            listener.onLongPress();
-        }
-    }
+
 
 
     private void check(KeyEvent event) {
@@ -114,9 +106,6 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         void onKeyUp();
 
         void onKeyDown();
-
-        void onLongPress(); // <--- 必须添加这一行
-    // ... 其他已有的方法如 onSingleTap, onDoubleTap
 
         void onKeyCenter();
 
