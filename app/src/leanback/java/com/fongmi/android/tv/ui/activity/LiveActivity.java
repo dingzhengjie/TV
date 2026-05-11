@@ -1140,7 +1140,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
-            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 TextView tv = new TextView(parent.getContext());
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
                 tv.setGravity(Gravity.CENTER);
@@ -1173,6 +1173,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         updateSetting("timeout", vals[position]);
                     } else if (mCurrentMenu == 3) {
                         updateSetting("boot_live", position == 1);
+                    }
+                    // 【修改点】这里也要改，确保点击后刷新的是 channel 列表
+                    if (mBinding.channel.getAdapter() != null) {
+                        mBinding.channel.getAdapter().notifyDataSetChanged();
                     }
                     // 刷新当前列表颜色
                     mBinding.channel.getAdapter().notifyDataSetChanged();
