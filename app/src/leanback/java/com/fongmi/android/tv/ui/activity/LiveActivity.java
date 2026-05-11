@@ -1212,63 +1212,94 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         refreshLeftAdapter(); // 刷新二级内容
     }
 
-
-
+    /**
+     * 刷新二级设置菜单内容
+     * 位置：LiveActivity.java
+     */
     private void refreshLeftAdapter() {
-        List<String> subItems = new ArrayList<>();
-        if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
-        else if (mCurrentMenu == 1) subItems.addAll(Arrays.asList("硬件解码", "软件解码", "原生解码"));
-        else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
-        else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
-
-        // 注意：左侧列表 ID 确认为 mBinding.channel
+        // 1. 确保二级菜单容器可见，并强制设置其宽度为窄条 (160dp)
+        mBinding.recycler.setVisibility(View.VISIBLE);
+        android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
+        params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
+        mBinding.recycler.setLayoutParams(params);
+    
+        // 2. 根据当前一级菜单索引 (mCurrentMenu) 准备二级菜单数据和当前选中的索引
+        List<String> items = new java.util.ArrayList<>();
+        int currentSelectedIndex = -1;
+    
+        if (mCurrentMenu == 0) { // 画面比例
+            items = java.util.Arrays.asList(ResUtil.getStringArray(R.array.select_scale));
+            currentSelectedIndex = Setting.getScale(); 
+        } else if (mCurrentMenu == 1) { // 播放解码
+            items = java.util.Arrays.asList(ResUtil.getStringArray(R.array.select_decode));
+            currentSelectedIndex = Setting.getDecode();
+        } else if (mCurrentMenu == 2) { // 超时换源
+            items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
+            currentSelectedIndex = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).indexOf(mTimeout);
+        } else if (mCurrentMenu == 3) { // 开机自启
+            items = java.util.Arrays.asList("开启", "关闭");
+            currentSelectedIndex = mBootLive ? 0 : 1;
+        }
+    
+        final int finalSelection = currentSelectedIndex;
+        final List<String> finalItems = items;
+    
+        // 3. 为二级列表 (mBinding.channel) 设置适配器
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
-            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup vg, int viewType) {
-                TextView tv = new TextView(vg.getContext());
-                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                android.widget.TextView tv = new android.widget.TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, ResUtil.dp2px(45)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
-                tv.setBackgroundResource(R.drawable.selector_item);
+                tv.setClickable(true);
+                tv.setTextSize(14);
+                tv.setBackgroundResource(R.drawable.selector_item); // 焦点选中样式
                 return new RecyclerView.ViewHolder(tv) {};
             }
-
+    
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                TextView tv = (TextView) holder.itemView;
-                String text = subItems.get(position);
-                tv.setText(text);
-
-                // 实时从配置中获取当前选中的颜色
-                android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
-                boolean isSelected = false;
-                if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
-                else if (mCurrentMenu == 3) {
-                    boolean boot = sp.getBoolean("boot_live", false);
-                    if ((boot && text.contains("开")) || (!boot && text.contains("关"))) isSelected = true;
+                android.widget.TextView tv = (android.widget.TextView) holder.itemView;
+                tv.setText(finalItems.get(position));
+    
+                // 【高亮逻辑】如果该项是系统当前生效的设置，改变文字颜色
+                if (position == finalSelection) {
+                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 高亮青色
+                    tv.setTypeface(null, android.graphics.Typeface.BOLD); // 加粗
+                } else {
+                    tv.setTextColor(android.graphics.Color.WHITE);
+                    tv.setTypeface(null, android.graphics.Typeface.NORMAL);
                 }
-
-                tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
-
-                // 在 refreshLeftAdapter 的适配器 onClick 内部
+    
+                // 【点击逻辑】
                 tv.setOnClickListener(v -> {
-                    // 1. 执行具体的设置变更
-                    if (mCurrentMenu == 0) onScale();
-                    else if (mCurrentMenu == 1) onDecode();
+                    if (mCurrentMenu == 0) onScale(position);
+                    else if (mCurrentMenu == 1) onDecode(position);
+                    else if (mCurrentMenu == 2) {
+                        mTimeout = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).get(position);
+                        updateSetting("timeout", mTimeout);
+                    } else if (mCurrentMenu == 3) {
+                        mBootLive = (position == 0);
+                        updateSetting("boot_live", mBootLive);
+                    }
                     
-                    // 2. 核心：强制刷新当前适配器，清除之前的选中状态
-                    mBinding.channel.getAdapter().notifyDataSetChanged(); 
-                    
-                    // 3. 自动关闭设置面板（可选，提升体验）
-                    // mBinding.linePanel.setVisibility(View.GONE);
+                    // 关键：点击后立即刷新本适配器，使高亮色切换到当前点击项
+                    notifyDataSetChanged();
                 });
-
+                
+                // 解决焦点：按左键或按返回键的逻辑通过 Activity 拦截处理
             }
+    
             @Override
-            public int getItemCount() { return subItems.size(); }
+            public int getItemCount() { return finalItems.size(); }
         });
+        
+        // 强制刷新一次布局
+        mBinding.channel.getAdapter().notifyDataSetChanged();
     }
+
 
 
     private void onPanelItemClick(int position) {
@@ -1313,24 +1344,37 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         super.onStop();
         if (Setting.isBackgroundOff()) mClock.stop();
     }
-
+    
     @Override
-    protected void onBackInvoked() {
-        
+    public void onBackInvoked() {
+        // 1. 如果二级菜单有焦点，隐藏二级容器，焦点回到右侧一级菜单
+        if (isVisible(mBinding.linePanel) && mBinding.channel.hasFocus()) {
+            mBinding.recycler.setVisibility(View.GONE); // 隐藏左侧二级条
+            android.view.View rv = findViewById(R.id.panelRecycler);
+            if (rv != null) rv.requestFocus(); // 焦点还给右侧一级
+            return;
+        }
+    
+        // 2. 如果只有一级菜单开着，关闭整个面板
         if (isVisible(mBinding.linePanel)) {
             mBinding.linePanel.setVisibility(View.GONE);
-            setRecyclerView(); // 【关键】关闭面板时，将左侧列表恢复为电视频道/线路
-        } else if (isVisible(mBinding.control.getRoot())) {
+            mBinding.recycler.setVisibility(View.GONE);
+            return;
+        }
+    
+        // 3. 原生逻辑（隐藏频道列表或退出）
+        if (isVisible(mBinding.control.getRoot())) {
             hideControl();
         } else if (isVisible(mBinding.widget.bottom)) {
             hideInfo();
         } else if (isVisible(mBinding.recycler)) {
             hideUI();
         } else {
-            if (isTaskRoot()) startActivity(new Intent(this, HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             super.onBackInvoked();
         }
     }
+
+
     private void initLiveSettings() {
         android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
         this.mTimeout = sp.getInt("timeout", 15);
