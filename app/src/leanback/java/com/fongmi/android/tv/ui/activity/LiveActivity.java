@@ -1128,6 +1128,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             mBinding.panelRecycler.requestFocus();
         }
     }
+
     private void refreshLeftAdapter() {
         List<String> subItems = new ArrayList<>();
         if (mCurrentMenu == 0) subItems.addAll(Arrays.asList("原始比例", "16:9", "4:3", "全屏拉伸"));
@@ -1135,17 +1136,15 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         else if (mCurrentMenu == 2) subItems.addAll(Arrays.asList("5秒", "15秒", "30秒", "60秒"));
         else if (mCurrentMenu == 3) subItems.addAll(Arrays.asList("开机自启: 关", "开机自启: 开"));
 
-        // 注意：这里要把 mBinding.recycler 替换为你 XML 里真实的 RecyclerView ID
-        // 假设真实的 ID 是 mBinding.channel
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
-            public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                TextView tv = new TextView(parent.getContext());
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup vg, int viewType) {
+                TextView tv = new TextView(vg.getContext()); // 这里的 vg 对应下面的参数名
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
-                tv.setGravity(Gravity.CENTER);
+                tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
-                tv.setBackgroundResource(com.fongmi.android.tv.R.drawable.selector_item);
+                tv.setBackgroundResource(R.drawable.selector_item);
                 return new RecyclerView.ViewHolder(tv) {};
             }
 
@@ -1155,6 +1154,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 String text = subItems.get(position);
                 tv.setText(text);
 
+                // 获取实时配置高亮
                 android.content.SharedPreferences sp = getSharedPreferences("fongmi_config", 0);
                 boolean isSelected = false;
                 if (mCurrentMenu == 2 && text.contains(sp.getInt("timeout", 15) + "秒")) isSelected = true;
@@ -1163,7 +1163,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                     if ((boot && text.contains("开")) || (!boot && text.contains("关"))) isSelected = true;
                 }
 
-                tv.setTextColor(isSelected ? Color.parseColor("#448AFF") : Color.WHITE);
+                tv.setTextColor(isSelected ? android.graphics.Color.parseColor("#448AFF") : android.graphics.Color.WHITE);
                 
                 tv.setOnClickListener(v -> {
                     if (mCurrentMenu == 0) onScale(); 
@@ -1174,18 +1174,18 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                     } else if (mCurrentMenu == 3) {
                         updateSetting("boot_live", position == 1);
                     }
-                    // 【修改点】这里也要改，确保点击后刷新的是 channel 列表
-                    if (mBinding.channel.getAdapter() != null) {
-                        mBinding.channel.getAdapter().notifyDataSetChanged();
-                    }
-                    // 刷新当前列表颜色
-                    mBinding.channel.getAdapter().notifyDataSetChanged();
+                    // 点击后通知当前适配器刷新颜色
+                    notifyDataSetChanged(); 
                 });
             }
+
             @Override
-            public int getItemCount() { return subItems.size(); }
+            public int getItemCount() {
+                return subItems.size();
+            }
         });
     }
+
 
     private void onPanelItemClick(int position) {
         switch (position) {
