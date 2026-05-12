@@ -1211,13 +1211,14 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.recycler.setLayoutParams(params);
         refreshLeftAdapter(); // 刷新二级内容
     }
-    
+
+
     /**
      * 刷新二级设置菜单内容
-     * 修复了 Setting 方法名错误，并实现了单项高亮逻辑
+     * 路径：LiveActivity.java
      */
     private void refreshLeftAdapter() {
-        // 1. 强制设置二级菜单容器宽度为 160dp (变窄)
+        // 1. 确保二级容器可见，并强制设为窄条宽度 (160dp)
         mBinding.recycler.setVisibility(View.VISIBLE);
         android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
@@ -1226,14 +1227,14 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
 
-        // 2. 根据一级菜单索引准备数据，并获取当前系统生效的配置索引
+        // 2. 数据准备与当前选中项获取
         if (mCurrentMenu == 0) { // 画面比例
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
             currentSelectedIndex = Setting.getScale(); 
         } else if (mCurrentMenu == 1) { // 播放解码
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_decode));
-            // 【修复点】将 getDecode 改为项目中实际存在的 getHttp
-            currentSelectedIndex = Setting.getHttp(); 
+            // 【修复点】使用 FongMi 项目标准方法名 getLiveDecode
+            currentSelectedIndex = Setting.getLiveDecode(); 
         } else if (mCurrentMenu == 2) { // 超时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
             java.util.List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
@@ -1246,7 +1247,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         final int finalSelection = currentSelectedIndex;
         final List<String> finalItems = items;
 
-        // 3. 绑定二级菜单适配器 (mBinding.channel)
+        // 3. 绑定二级菜单适配器
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
@@ -1266,24 +1267,23 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
 
-                // 【高亮逻辑】判断当前项是否为选中项
+                // 【高亮显示】如果索引匹配当前设置，显示青色
                 if (position == finalSelection) {
-                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 高亮青色
-                    tv.setTypeface(null, android.graphics.Typeface.BOLD); // 加粗
+                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); 
+                    tv.setTypeface(null, android.graphics.Typeface.BOLD);
                 } else {
                     tv.setTextColor(android.graphics.Color.WHITE);
                     tv.setTypeface(null, android.graphics.Typeface.NORMAL);
                 }
 
-                // 【点击逻辑】执行设置并保存
                 tv.setOnClickListener(v -> {
                     if (mCurrentMenu == 0) {
                         Setting.putScale(position);
-                        onScale(); // 调用 Activity 原生的无参方法
+                        onScale(); // 刷新画面比例
                     } else if (mCurrentMenu == 1) {
-                        // 【修复点】将 putDecode 改为 putHttp
-                        Setting.putHttp(position);
-                        onDecode(); // 调用 Activity 原生的无参方法
+                        // 【修复点】使用 putLiveDecode
+                        Setting.putLiveDecode(position);
+                        onDecode(); // 重启播放器生效
                     } else if (mCurrentMenu == 2) {
                         mTimeout = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).get(position);
                         updateSetting("timeout", mTimeout);
@@ -1291,8 +1291,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         mBootLive = (position == 0);
                         updateSetting("boot_live", mBootLive);
                     }
-                    
-                    // 立即刷新，让高亮色显示在当前点击的项上
+                    // 立即刷新本列表，显示点击后的高亮状态
                     notifyDataSetChanged();
                 });
             }
@@ -1301,10 +1300,8 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             public int getItemCount() { return finalItems.size(); }
         });
         
-        // 滚动到当前选中的位置
         if (currentSelectedIndex >= 0) mBinding.channel.scrollToPosition(currentSelectedIndex);
     }
-
 
 
     private void onPanelItemClick(int position) {
