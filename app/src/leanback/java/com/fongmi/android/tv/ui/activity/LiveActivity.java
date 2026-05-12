@@ -1140,13 +1140,40 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
     @Override
     public void onMenu() {
-        // ... (前面的 View 显示逻辑保持不变)
-        
-        // 只有 3 个选项，去掉了播放解码
+        if (mBinding.linePanel == null) return;
+
+        hideControl();
+        hideInfo();
+        mBinding.recycler.setVisibility(View.GONE); // 初始隐藏频道列表
+
+        mBinding.linePanel.setVisibility(View.VISIBLE);
+        mBinding.linePanel.bringToFront();
+
+        // 修复：在这里明确获取并定义变量
+        TextView tvTime = findViewById(R.id.panelTime);
+        TextView tvSpeed = findViewById(R.id.panelNetSpeed);
+        RecyclerView rvPanel = findViewById(R.id.panelRecycler);
+
+        if (tvTime != null) tvTime.setText(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(new java.util.Date()));
+        if (tvSpeed != null) com.fongmi.android.tv.utils.Traffic.setSpeed(tvSpeed);
+
+        // 一级菜单：移除了播放解码
         List<String> mainItems = java.util.Arrays.asList("画面比例", "超时换源", "开机自启");
+        rvPanel.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
         rvPanel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-            // ... onCreateViewHolder 保持不变
-            
+            @NonNull
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                TextView tv = new TextView(parent.getContext());
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(48)));
+                tv.setGravity(android.view.Gravity.CENTER);
+                tv.setFocusable(true);
+                tv.setTextColor(android.graphics.Color.WHITE);
+                tv.setTextSize(14);
+                tv.setBackgroundResource(R.drawable.selector_item);
+                return new RecyclerView.ViewHolder(tv) {};
+            }
+
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 TextView tv = (TextView) holder.itemView;
@@ -1155,30 +1182,25 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
-                        refreshLeftAdapter(); // 焦点移动时直接刷新二级
+                        refreshLeftAdapter(); // 焦点移动即刷新二级
                     }
                 });
-                
+
                 tv.setOnClickListener(v -> {
                     mCurrentMenu = position;
                     refreshLeftAdapter();
-                    mBinding.channel.requestFocus(); // 点击后焦点进入二级菜单
+                    mBinding.channel.requestFocus(); // 焦点进入二级
                 });
             }
+
             @Override
             public int getItemCount() { return mainItems.size(); }
         });
+
         rvPanel.requestFocus();
     }
-
-    /**
-     * 刷新二级设置菜单
-     * 1. 移除了导致报错的“播放解码”项
-     * 2. 修正了 Setting 方法名
-     * 3. 实现单项高亮和窄条布局
-     */
     private void refreshLeftAdapter() {
-        // 强制设置二级菜单容器宽度为 160dp (变窄)，确保不遮挡一级菜单
+        // 关键：强制让二级容器(channel所在的容器)显示并变窄
         mBinding.recycler.setVisibility(View.VISIBLE);
         android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
@@ -1187,16 +1209,14 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
 
-        // 根据 mCurrentMenu 索引准备数据 (注意：此处索引需与 onMenu 中的 mainItems 对应)
         if (mCurrentMenu == 0) { // 画面比例
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
-            // 尝试使用 getLiveScale 或 getScale
-            try { currentSelectedIndex = Setting.getScale(); } catch (Exception e) { currentSelectedIndex = 0; }
-        } else if (mCurrentMenu == 1) { // 超时换源 (原索引1)
+            currentSelectedIndex = Setting.getScale(); 
+        } else if (mCurrentMenu == 1) { // 超t时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
             java.util.List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
             currentSelectedIndex = times.indexOf(mTimeout);
-        } else if (mCurrentMenu == 2) { // 开机自启 (原索引2)
+        } else if (mCurrentMenu == 2) { // 开机自启
             items = java.util.Arrays.asList("开启", "关闭");
             currentSelectedIndex = mBootLive ? 0 : 1;
         }
@@ -1208,7 +1228,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                android.widget.TextView tv = new android.widget.TextView(parent.getContext());
+                TextView tv = new TextView(parent.getContext());
                 tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
@@ -1220,10 +1240,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                android.widget.TextView tv = (android.widget.TextView) holder.itemView;
+                TextView tv = (TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
 
-                // 【高亮逻辑】当前选中项设为青色
+                // 单个元素高亮：如果是当前设置，显示青色
                 if (position == finalSelection) {
                     tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); 
                     tv.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -1243,8 +1263,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         mBootLive = (position == 0);
                         updateSetting("boot_live", mBootLive);
                     }
-                    // 刷新列表以更新高亮色
-                    notifyDataSetChanged();
+                    notifyDataSetChanged(); // 刷新高亮
                 });
             }
 
