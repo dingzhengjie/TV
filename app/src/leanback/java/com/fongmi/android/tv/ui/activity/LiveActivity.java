@@ -1146,32 +1146,33 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         super.onBackInvoked();
     }
 
-    @Override
-    public void onDoubleTap() {
-        // 双击逻辑，通常留空或根据需求实现
-    }
-
+    // --- 修正后的手势监听接口实现 ---
     @Override
     public void onSingleTap() {
-        // 单击逻辑，通常留空
+        // 单击逻辑
     }
 
     @Override
     public void onDoubleTap() {
-        // 双击逻辑，通常留空
+        // 双击逻辑
     }
 
+    @Override
+    public void onLongPress() {
+        // 补全长按逻辑，防止编译报错
+        onMenu();
+    }
+    // ----------------------------
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // 1. 物理菜单键直接拦截
         if (keyCode == KeyEvent.KEYCODE_MENU) {
             onMenu();
             return true;
         }
-        // 2. 核心：如果长按确定键，跳转到 onMenu 而不是弹出列表
         if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
-            if (event.isLongPress()) {
+            // 只有在没有显示设置菜单时，才允许长按确定键弹出菜单
+            if (event.isLongPress() && isGone(mBinding.linePanel)) {
                 onMenu();
                 return true;
             }
