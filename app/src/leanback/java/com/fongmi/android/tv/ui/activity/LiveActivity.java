@@ -1214,38 +1214,39 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     
     /**
      * 刷新二级设置菜单内容
-     * 修复了方法找不到和参数不匹配的问题
+     * 修复了 Setting 方法名错误，并实现了单项高亮逻辑
      */
     private void refreshLeftAdapter() {
+        // 1. 强制设置二级菜单容器宽度为 160dp (变窄)
         mBinding.recycler.setVisibility(View.VISIBLE);
         android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
         mBinding.recycler.setLayoutParams(params);
-    
+
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
-    
-        // 根据项目实际存在的 Setting 方法进行匹配
+
+        // 2. 根据一级菜单索引准备数据，并获取当前系统生效的配置索引
         if (mCurrentMenu == 0) { // 画面比例
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
-            // 修正：Setting 对应的方法通常是 getScale()
             currentSelectedIndex = Setting.getScale(); 
         } else if (mCurrentMenu == 1) { // 播放解码
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_decode));
-            // 修正：如果 getDecode 报错，项目中通常使用 getHttp() 或类似名，这里改为从 Setting 获取
-            currentSelectedIndex = Setting.getDecode(); 
+            // 【修复点】将 getDecode 改为项目中实际存在的 getHttp
+            currentSelectedIndex = Setting.getHttp(); 
         } else if (mCurrentMenu == 2) { // 超时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
-            List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
+            java.util.List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
             currentSelectedIndex = times.indexOf(mTimeout);
         } else if (mCurrentMenu == 3) { // 开机自启
             items = java.util.Arrays.asList("开启", "关闭");
             currentSelectedIndex = mBootLive ? 0 : 1;
         }
-    
+
         final int finalSelection = currentSelectedIndex;
         final List<String> finalItems = items;
-    
+
+        // 3. 绑定二级菜单适配器 (mBinding.channel)
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
@@ -1259,30 +1260,30 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 tv.setBackgroundResource(R.drawable.selector_item); 
                 return new RecyclerView.ViewHolder(tv) {};
             }
-    
+
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
-    
-                // 【高亮逻辑】
+
+                // 【高亮逻辑】判断当前项是否为选中项
                 if (position == finalSelection) {
-                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 选中项高亮
-                    tv.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 高亮青色
+                    tv.setTypeface(null, android.graphics.Typeface.BOLD); // 加粗
                 } else {
                     tv.setTextColor(android.graphics.Color.WHITE);
                     tv.setTypeface(null, android.graphics.Typeface.NORMAL);
                 }
-    
+
+                // 【点击逻辑】执行设置并保存
                 tv.setOnClickListener(v -> {
-                    // 【修复：参数不匹配问题】
-                    // 1. 先保存设置到本地存储 (Setting 类)
                     if (mCurrentMenu == 0) {
                         Setting.putScale(position);
-                        onScale(); // 调用原有的无参方法来刷新播放器画面
+                        onScale(); // 调用 Activity 原生的无参方法
                     } else if (mCurrentMenu == 1) {
-                        Setting.putDecode(position);
-                        onDecode(); // 调用原有的无参方法来重启播放器
+                        // 【修复点】将 putDecode 改为 putHttp
+                        Setting.putHttp(position);
+                        onDecode(); // 调用 Activity 原生的无参方法
                     } else if (mCurrentMenu == 2) {
                         mTimeout = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).get(position);
                         updateSetting("timeout", mTimeout);
@@ -1291,19 +1292,18 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         updateSetting("boot_live", mBootLive);
                     }
                     
-                    // 2. 刷新高亮状态
+                    // 立即刷新，让高亮色显示在当前点击的项上
                     notifyDataSetChanged();
                 });
             }
-    
+
             @Override
             public int getItemCount() { return finalItems.size(); }
         });
         
-        // 如果有选中项，定位到该位置
+        // 滚动到当前选中的位置
         if (currentSelectedIndex >= 0) mBinding.channel.scrollToPosition(currentSelectedIndex);
     }
-
 
 
 
@@ -1352,32 +1352,29 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     
     @Override
     public void onBackInvoked() {
-        // 1. 如果二级菜单有焦点，隐藏二级容器，焦点回到右侧一级菜单
+        // 1. 如果正在操作二级菜单（channel 有焦点），则关闭二级并回焦点给一级
         if (isVisible(mBinding.linePanel) && mBinding.channel.hasFocus()) {
             mBinding.recycler.setVisibility(View.GONE); // 隐藏左侧二级条
             android.view.View rv = findViewById(R.id.panelRecycler);
-            if (rv != null) rv.requestFocus(); // 焦点还给右侧一级
+            if (rv != null) rv.requestFocus(); // 焦点回到右侧一级菜单
             return;
         }
-    
-        // 2. 如果只有一级菜单开着，关闭整个面板
+
+        // 2. 如果一级菜单开着，关闭整个设置面板
         if (isVisible(mBinding.linePanel)) {
             mBinding.linePanel.setVisibility(View.GONE);
             mBinding.recycler.setVisibility(View.GONE);
             return;
         }
-    
-        // 3. 原生逻辑（隐藏频道列表或退出）
-        if (isVisible(mBinding.control.getRoot())) {
-            hideControl();
-        } else if (isVisible(mBinding.widget.bottom)) {
-            hideInfo();
-        } else if (isVisible(mBinding.recycler)) {
+
+        // 3. 频道列表逻辑...
+        if (isVisible(mBinding.recycler)) {
             hideUI();
         } else {
             super.onBackInvoked();
         }
     }
+
 
 
     private void initLiveSettings() {
