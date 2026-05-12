@@ -1096,6 +1096,56 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         if (Setting.isInvert()) prevChannel();
         else nextChannel();
     }
+    /**
+     * 代码位置：LiveActivity.java 类内部，建议放在 onKeyDown 之后
+     */
+    @Override
+    public void onBackInvoked() {
+        // 1. 优先检查：如果二级设置列表 (channel) 正在获得焦点
+        // 我们判断焦点是否在 mBinding.channel 上，以此确认用户是否在操作二级菜单
+        if (isVisible(mBinding.linePanel) && mBinding.channel.hasFocus()) {
+            // 动作：仅隐藏左侧二级窄条，不关闭主面板
+            mBinding.channel.setVisibility(View.GONE); 
+            
+            // 动作：强制将焦点还给右侧的一级菜单列表
+            RecyclerView rvPanel = findViewById(R.id.panelRecycler);
+            if (rvPanel != null) {
+                rvPanel.requestFocus();
+            }
+            return; // 拦截返回键，不再往下执行
+        }
+
+        // 2. 次优先：如果设置面板 (linePanel) 开着（此时焦点必然在一级菜单上）
+        if (isVisible(mBinding.linePanel)) {
+            // 动作：关闭整个设置层
+            mBinding.linePanel.setVisibility(View.GONE);
+            mBinding.channel.setVisibility(View.GONE);
+            return; // 拦截返回键
+        }
+
+        // 3. 基础逻辑：如果频道列表 (recycler) 正在显示（原生功能）
+        if (isVisible(mBinding.recycler)) {
+            hideUI(); // 调用原项目的隐藏频道列表函数
+            return;
+        }
+
+        // 4. 其他 UI 状态处理（控制栏、节目详情等）
+        if (isVisible(mBinding.control.getRoot())) {
+            hideControl();
+            return;
+        } else if (isVisible(mBinding.widget.bottom)) {
+            hideInfo();
+            return;
+        }
+
+        // 5. 最后：如果没有弹出任何 UI，则执行系统默认返回（退出播放或回到主页）
+        if (isTaskRoot()) {
+            startActivity(new Intent(this, HomeActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
+        }
+        super.onBackInvoked();
+    }
+
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -1137,27 +1187,29 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     public void onMenu() {
         showControl(getFocus2());
     }*/
-
+    
     @Override
     public void onMenu() {
         if (mBinding.linePanel == null) return;
-
+    
+        // 1. 彻底隐藏原有的频道列表和控制栏，防止 UI 重叠
         hideControl();
         hideInfo();
-        mBinding.recycler.setVisibility(View.GONE); // 初始隐藏频道列表
-
+        mBinding.recycler.setVisibility(View.GONE); // 隐藏频道列表容器
+    
+        // 2. 显示设置面板
         mBinding.linePanel.setVisibility(View.VISIBLE);
         mBinding.linePanel.bringToFront();
-
-        // 修复：在这里明确获取并定义变量
+    
+        // 3. 获取 View
         TextView tvTime = findViewById(R.id.panelTime);
         TextView tvSpeed = findViewById(R.id.panelNetSpeed);
         RecyclerView rvPanel = findViewById(R.id.panelRecycler);
-
+    
         if (tvTime != null) tvTime.setText(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA).format(new java.util.Date()));
         if (tvSpeed != null) com.fongmi.android.tv.utils.Traffic.setSpeed(tvSpeed);
-
-        // 一级菜单：移除了播放解码
+    
+        // 一级菜单：去掉了“播放解码”
         List<String> mainItems = java.util.Arrays.asList("画面比例", "超时换源", "开机自启");
         rvPanel.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
         rvPanel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -1173,46 +1225,52 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 tv.setBackgroundResource(R.drawable.selector_item);
                 return new RecyclerView.ViewHolder(tv) {};
             }
-
+    
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 TextView tv = (TextView) holder.itemView;
                 tv.setText(mainItems.get(position));
                 
+                // 焦点移动时刷新二级菜单
                 tv.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
                         mCurrentMenu = position;
-                        refreshLeftAdapter(); // 焦点移动即刷新二级
+                        refreshLeftAdapter(); 
                     }
                 });
-
+    
+                // 点击时焦点进入二级
                 tv.setOnClickListener(v -> {
                     mCurrentMenu = position;
                     refreshLeftAdapter();
-                    mBinding.channel.requestFocus(); // 焦点进入二级
+                    mBinding.channel.requestFocus(); 
                 });
             }
-
             @Override
             public int getItemCount() { return mainItems.size(); }
         });
-
+    
         rvPanel.requestFocus();
     }
+    
     private void refreshLeftAdapter() {
-        // 关键：强制让二级容器(channel所在的容器)显示并变窄
-        mBinding.recycler.setVisibility(View.VISIBLE);
-        android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
+        // 【关键修改】不要操作 mBinding.recycler，那是频道列表的根容器
+        // 确保二级菜单列表本身可见
+        mBinding.channel.setVisibility(View.VISIBLE);
+        
+        // 强制设置二级菜单列表的宽度为窄条 (160dp)
+        android.view.ViewGroup.LayoutParams params = mBinding.channel.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
-        mBinding.recycler.setLayoutParams(params);
-
+        mBinding.channel.setLayoutParams(params);
+    
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
-
+    
+        // 获取当前配置索引
         if (mCurrentMenu == 0) { // 画面比例
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
             currentSelectedIndex = Setting.getScale(); 
-        } else if (mCurrentMenu == 1) { // 超t时换源
+        } else if (mCurrentMenu == 1) { // 超时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
             java.util.List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
             currentSelectedIndex = times.indexOf(mTimeout);
@@ -1220,10 +1278,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
             items = java.util.Arrays.asList("开启", "关闭");
             currentSelectedIndex = mBootLive ? 0 : 1;
         }
-
+    
         final int finalSelection = currentSelectedIndex;
         final List<String> finalItems = items;
-
+    
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
@@ -1237,13 +1295,13 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 tv.setBackgroundResource(R.drawable.selector_item); 
                 return new RecyclerView.ViewHolder(tv) {};
             }
-
+    
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 TextView tv = (TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
-
-                // 单个元素高亮：如果是当前设置，显示青色
+    
+                // 单个元素高亮
                 if (position == finalSelection) {
                     tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); 
                     tv.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -1251,7 +1309,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                     tv.setTextColor(android.graphics.Color.WHITE);
                     tv.setTypeface(null, android.graphics.Typeface.NORMAL);
                 }
-
+    
                 tv.setOnClickListener(v -> {
                     if (mCurrentMenu == 0) {
                         Setting.putScale(position);
@@ -1263,86 +1321,13 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         mBootLive = (position == 0);
                         updateSetting("boot_live", mBootLive);
                     }
-                    notifyDataSetChanged(); // 刷新高亮
+                    notifyDataSetChanged(); // 点击后立即刷新颜色
                 });
             }
-
             @Override
             public int getItemCount() { return finalItems.size(); }
         });
-        
-        if (currentSelectedIndex >= 0) mBinding.channel.scrollToPosition(currentSelectedIndex);
     }
-
-
-    private void onPanelItemClick(int position) {
-        switch (position) {
-            case 0: nextLine(true); break;
-            case 1: onScale(); break;
-            case 2: onDecode(); break;
-            case 3: break; 
-            case 4: onConfig(); break;
-            case 5: onHome(); break;
-        }
-        mBinding.linePanel.setVisibility(View.GONE);
-    }
-
-
-
-    @Override
-    public void onSingleTap() {
-        onToggle();
-    }
-
-    @Override
-    public void onDoubleTap() {
-        if (isVisible(mBinding.recycler)) hideUI();
-        else if (isVisible(mBinding.control.getRoot())) hideControl();
-        else onMenu();
-    }
-    @Override
-    public void onLongPress() {
-        // 隐藏普通控制栏，弹出设置菜单
-        onMenu();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        mClock.stop().start();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        if (Setting.isBackgroundOff()) mClock.stop();
-    }
-    
-    @Override
-    public void onBackInvoked() {
-        // 1. 如果正在操作二级菜单（channel 有焦点），则关闭二级并回焦点给一级
-        if (isVisible(mBinding.linePanel) && mBinding.channel.hasFocus()) {
-            mBinding.recycler.setVisibility(View.GONE); // 隐藏左侧二级条
-            android.view.View rv = findViewById(R.id.panelRecycler);
-            if (rv != null) rv.requestFocus(); // 焦点回到右侧一级菜单
-            return;
-        }
-
-        // 2. 如果一级菜单开着，关闭整个设置面板
-        if (isVisible(mBinding.linePanel)) {
-            mBinding.linePanel.setVisibility(View.GONE);
-            mBinding.recycler.setVisibility(View.GONE);
-            return;
-        }
-
-        // 3. 频道列表逻辑...
-        if (isVisible(mBinding.recycler)) {
-            hideUI();
-        } else {
-            super.onBackInvoked();
-        }
-    }
-
 
 
     private void initLiveSettings() {
