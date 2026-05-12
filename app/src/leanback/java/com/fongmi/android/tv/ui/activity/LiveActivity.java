@@ -1152,6 +1152,17 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     @Override
+    public void onSingleTap() {
+        // 单击逻辑，通常留空
+    }
+
+    @Override
+    public void onDoubleTap() {
+        // 双击逻辑，通常留空
+    }
+
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         // 1. 物理菜单键直接拦截
         if (keyCode == KeyEvent.KEYCODE_MENU) {
