@@ -1146,6 +1146,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         super.onBackInvoked();
     }
 
+    @Override
+    public void onDoubleTap() {
+        // 双击逻辑，通常留空或根据需求实现
+    }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
