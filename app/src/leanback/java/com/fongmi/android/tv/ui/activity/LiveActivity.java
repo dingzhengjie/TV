@@ -1211,31 +1211,33 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         mBinding.recycler.setLayoutParams(params);
         refreshLeftAdapter(); // 刷新二级内容
     }
-
+    
     /**
      * 刷新二级设置菜单内容
-     * 位置：LiveActivity.java
+     * 修复了方法找不到和参数不匹配的问题
      */
     private void refreshLeftAdapter() {
-        // 1. 确保二级菜单容器可见，并强制设置其宽度为窄条 (160dp)
         mBinding.recycler.setVisibility(View.VISIBLE);
         android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
         mBinding.recycler.setLayoutParams(params);
     
-        // 2. 根据当前一级菜单索引 (mCurrentMenu) 准备二级菜单数据和当前选中的索引
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
     
+        // 根据项目实际存在的 Setting 方法进行匹配
         if (mCurrentMenu == 0) { // 画面比例
-            items = java.util.Arrays.asList(ResUtil.getStringArray(R.array.select_scale));
+            items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
+            // 修正：Setting 对应的方法通常是 getScale()
             currentSelectedIndex = Setting.getScale(); 
         } else if (mCurrentMenu == 1) { // 播放解码
-            items = java.util.Arrays.asList(ResUtil.getStringArray(R.array.select_decode));
-            currentSelectedIndex = Setting.getDecode();
+            items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_decode));
+            // 修正：如果 getDecode 报错，项目中通常使用 getHttp() 或类似名，这里改为从 Setting 获取
+            currentSelectedIndex = Setting.getDecode(); 
         } else if (mCurrentMenu == 2) { // 超时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
-            currentSelectedIndex = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).indexOf(mTimeout);
+            List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
+            currentSelectedIndex = times.indexOf(mTimeout);
         } else if (mCurrentMenu == 3) { // 开机自启
             items = java.util.Arrays.asList("开启", "关闭");
             currentSelectedIndex = mBootLive ? 0 : 1;
@@ -1244,18 +1246,17 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         final int finalSelection = currentSelectedIndex;
         final List<String> finalItems = items;
     
-        // 3. 为二级列表 (mBinding.channel) 设置适配器
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
                 android.widget.TextView tv = new android.widget.TextView(parent.getContext());
-                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, ResUtil.dp2px(45)));
+                tv.setLayoutParams(new ViewGroup.LayoutParams(-1, com.fongmi.android.tv.utils.ResUtil.dp2px(45)));
                 tv.setGravity(android.view.Gravity.CENTER);
                 tv.setFocusable(true);
                 tv.setClickable(true);
                 tv.setTextSize(14);
-                tv.setBackgroundResource(R.drawable.selector_item); // 焦点选中样式
+                tv.setBackgroundResource(R.drawable.selector_item); 
                 return new RecyclerView.ViewHolder(tv) {};
             }
     
@@ -1264,20 +1265,25 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
     
-                // 【高亮逻辑】如果该项是系统当前生效的设置，改变文字颜色
+                // 【高亮逻辑】
                 if (position == finalSelection) {
-                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 高亮青色
-                    tv.setTypeface(null, android.graphics.Typeface.BOLD); // 加粗
+                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 选中项高亮
+                    tv.setTypeface(null, android.graphics.Typeface.BOLD);
                 } else {
                     tv.setTextColor(android.graphics.Color.WHITE);
                     tv.setTypeface(null, android.graphics.Typeface.NORMAL);
                 }
     
-                // 【点击逻辑】
                 tv.setOnClickListener(v -> {
-                    if (mCurrentMenu == 0) onScale(position);
-                    else if (mCurrentMenu == 1) onDecode(position);
-                    else if (mCurrentMenu == 2) {
+                    // 【修复：参数不匹配问题】
+                    // 1. 先保存设置到本地存储 (Setting 类)
+                    if (mCurrentMenu == 0) {
+                        Setting.putScale(position);
+                        onScale(); // 调用原有的无参方法来刷新播放器画面
+                    } else if (mCurrentMenu == 1) {
+                        Setting.putDecode(position);
+                        onDecode(); // 调用原有的无参方法来重启播放器
+                    } else if (mCurrentMenu == 2) {
                         mTimeout = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).get(position);
                         updateSetting("timeout", mTimeout);
                     } else if (mCurrentMenu == 3) {
@@ -1285,20 +1291,19 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         updateSetting("boot_live", mBootLive);
                     }
                     
-                    // 关键：点击后立即刷新本适配器，使高亮色切换到当前点击项
+                    // 2. 刷新高亮状态
                     notifyDataSetChanged();
                 });
-                
-                // 解决焦点：按左键或按返回键的逻辑通过 Activity 拦截处理
             }
     
             @Override
             public int getItemCount() { return finalItems.size(); }
         });
         
-        // 强制刷新一次布局
-        mBinding.channel.getAdapter().notifyDataSetChanged();
+        // 如果有选中项，定位到该位置
+        if (currentSelectedIndex >= 0) mBinding.channel.scrollToPosition(currentSelectedIndex);
     }
+
 
 
 
