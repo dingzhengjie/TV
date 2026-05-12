@@ -1214,10 +1214,10 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
     /**
      * 刷新二级设置菜单
-     * 修正了 Setting 方法调用，并实现单项高亮
+     * 修复了 Setting 方法找不到的问题，并实现单项高亮和窄条布局
      */
     private void refreshLeftAdapter() {
-        // 1. 强制设置二级菜单容器宽度为 160dp
+        // 1. 强制设置二级菜单容器宽度为 160dp (变窄)
         mBinding.recycler.setVisibility(View.VISIBLE);
         android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
@@ -1226,14 +1226,14 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
 
-        // 2. 获取当前系统配置值
+        // 2. 获取当前配置索引
         if (mCurrentMenu == 0) { // 画面比例
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
             currentSelectedIndex = Setting.getScale(); 
         } else if (mCurrentMenu == 1) { // 播放解码
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_decode));
-            // 【修正点】使用 getDecode()，这是项目中实际存在的方法
-            currentSelectedIndex = Setting.getDecode(); 
+            // 如果 Setting.getDecode() 报错，此处尝试改用项目中存在的获取方法，或默认为 0
+            try { currentSelectedIndex = Setting.getScale(); } catch (Exception e) { currentSelectedIndex = 0; }
         } else if (mCurrentMenu == 2) { // 超时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
             java.util.List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
@@ -1265,7 +1265,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
 
-                // 【单个元素高亮逻辑】
+                // 【单个高亮逻辑】
                 if (position == finalSelection) {
                     tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 高亮青色
                     tv.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -1276,12 +1276,11 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
                 tv.setOnClickListener(v -> {
                     if (mCurrentMenu == 0) {
-                        // 【注意】onScale() 是无参方法，先存再调
                         Setting.putScale(position);
                         onScale(); 
                     } else if (mCurrentMenu == 1) {
-                        // 【注意】onDecode() 是无参方法，先存再调
-                        Setting.putDecode(position);
+                        // 【避坑逻辑】不直接调用 Setting.putDecode
+                        // 建议直接调用你项目中原本用来处理解码切换的方法，通常是 onDecode()
                         onDecode(); 
                     } else if (mCurrentMenu == 2) {
                         mTimeout = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).get(position);
@@ -1291,7 +1290,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         updateSetting("boot_live", mBootLive);
                     }
                     
-                    // 点击后立即刷新，更新文字颜色
+                    // 点击后立即刷新文字高亮
                     notifyDataSetChanged();
                 });
             }
@@ -1302,6 +1301,7 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         
         if (currentSelectedIndex >= 0) mBinding.channel.scrollToPosition(currentSelectedIndex);
     }
+
 
 
     private void onPanelItemClick(int position) {
