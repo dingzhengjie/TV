@@ -1212,13 +1212,12 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         refreshLeftAdapter(); // 刷新二级内容
     }
 
-
     /**
-     * 刷新二级设置菜单内容
-     * 路径：LiveActivity.java
+     * 刷新二级设置菜单
+     * 修正了 Setting 方法调用，并实现单项高亮
      */
     private void refreshLeftAdapter() {
-        // 1. 确保二级容器可见，并强制设为窄条宽度 (160dp)
+        // 1. 强制设置二级菜单容器宽度为 160dp
         mBinding.recycler.setVisibility(View.VISIBLE);
         android.view.ViewGroup.LayoutParams params = mBinding.recycler.getLayoutParams();
         params.width = com.fongmi.android.tv.utils.ResUtil.dp2px(160); 
@@ -1227,14 +1226,14 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         List<String> items = new java.util.ArrayList<>();
         int currentSelectedIndex = -1;
 
-        // 2. 数据准备与当前选中项获取
+        // 2. 获取当前系统配置值
         if (mCurrentMenu == 0) { // 画面比例
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_scale));
             currentSelectedIndex = Setting.getScale(); 
         } else if (mCurrentMenu == 1) { // 播放解码
             items = java.util.Arrays.asList(com.fongmi.android.tv.utils.ResUtil.getStringArray(R.array.select_decode));
-            // 【修复点】使用 FongMi 项目标准方法名 getLiveDecode
-            currentSelectedIndex = Setting.getLiveDecode(); 
+            // 【修正点】使用 getDecode()，这是项目中实际存在的方法
+            currentSelectedIndex = Setting.getDecode(); 
         } else if (mCurrentMenu == 2) { // 超时换源
             items = java.util.Arrays.asList("5秒", "10秒", "15秒", "20秒", "25秒", "30秒");
             java.util.List<Integer> times = java.util.Arrays.asList(5, 10, 15, 20, 25, 30);
@@ -1247,7 +1246,6 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
         final int finalSelection = currentSelectedIndex;
         final List<String> finalItems = items;
 
-        // 3. 绑定二级菜单适配器
         mBinding.channel.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull
             @Override
@@ -1267,9 +1265,9 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                 android.widget.TextView tv = (android.widget.TextView) holder.itemView;
                 tv.setText(finalItems.get(position));
 
-                // 【高亮显示】如果索引匹配当前设置，显示青色
+                // 【单个元素高亮逻辑】
                 if (position == finalSelection) {
-                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); 
+                    tv.setTextColor(android.graphics.Color.parseColor("#03DAC5")); // 高亮青色
                     tv.setTypeface(null, android.graphics.Typeface.BOLD);
                 } else {
                     tv.setTextColor(android.graphics.Color.WHITE);
@@ -1278,12 +1276,13 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
 
                 tv.setOnClickListener(v -> {
                     if (mCurrentMenu == 0) {
+                        // 【注意】onScale() 是无参方法，先存再调
                         Setting.putScale(position);
-                        onScale(); // 刷新画面比例
+                        onScale(); 
                     } else if (mCurrentMenu == 1) {
-                        // 【修复点】使用 putLiveDecode
-                        Setting.putLiveDecode(position);
-                        onDecode(); // 重启播放器生效
+                        // 【注意】onDecode() 是无参方法，先存再调
+                        Setting.putDecode(position);
+                        onDecode(); 
                     } else if (mCurrentMenu == 2) {
                         mTimeout = java.util.Arrays.asList(5, 10, 15, 20, 25, 30).get(position);
                         updateSetting("timeout", mTimeout);
@@ -1291,7 +1290,8 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
                         mBootLive = (position == 0);
                         updateSetting("boot_live", mBootLive);
                     }
-                    // 立即刷新本列表，显示点击后的高亮状态
+                    
+                    // 点击后立即刷新，更新文字颜色
                     notifyDataSetChanged();
                 });
             }
