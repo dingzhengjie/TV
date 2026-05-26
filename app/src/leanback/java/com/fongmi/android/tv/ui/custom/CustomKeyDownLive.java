@@ -48,7 +48,6 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         if (listener.dispatch(true)) check(event);
     }
 
-
     private void check(KeyEvent event) {
         if (KeyUtil.isActionDown(event) && KeyUtil.isLeftKey(event)) {
             listener.onSeeking(subTime());
@@ -68,9 +67,6 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
             listener.onKeyCenter();
         } else if (KeyUtil.isMenuKey(event) || event.isLongPress() && KeyUtil.isEnterKey(event)) {
             listener.onMenu();
-        } else if (event.isLongPress() && KeyUtil.isEnterKey(event)) {
-            // 核心：遥控器长按 OK 键，也指向 onMenu，而不是 onKeyCenter
-            listener.onMenu();
         }
     }
 
@@ -81,27 +77,10 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         App.post(runnable, 2000);
     }
 
-    /*@Override
+    @Override
     public boolean onDoubleTap(@NonNull MotionEvent e) {
         if (listener.dispatch(false)) listener.onDoubleTap();
         return true;
-    }*/
-    // 位置：CustomKeyDownLive.java 约 110 行附近
-    @Override
-    public boolean onDoubleTap(@NonNull MotionEvent e) {
-        // 删掉原有的 dispatch 判断，直接执行 onMenu
-        listener.onMenu(); 
-        return true;
-    }
-
-    // 在 CustomKeyDownLive.java 约 100-150 行附近
-    @Override
-    public void onLongPress(MotionEvent e) {
-        super.onLongPress(e);
-        // 这里是核心：将手势分发给 Activity (Listener)
-        if (listener != null) {
-            listener.onLongPress();
-        }
     }
 
     @Override
@@ -139,8 +118,6 @@ public class CustomKeyDownLive extends GestureDetector.SimpleOnGestureListener {
         void onKeyUp();
 
         void onKeyDown();
-        void onLongPress(); // <--- 必须添加这一行
-        // ... 其他已有的方法如 onSingleTap, onDoubleTap
 
         void onKeyLeft(long time);
 
