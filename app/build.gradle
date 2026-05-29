@@ -20,7 +20,7 @@ android {
         //noinspection ExpiredTargetSdkVersion
         targetSdk 28
         versionCode 541
-        versionName "5.4.1"
+        versionName "5.4.2"
         multiDexEnabled true
         javaCompileOptions {
             annotationProcessorOptions {
