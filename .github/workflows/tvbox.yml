@@ -1,7 +1,7 @@
 name: Build Android APK
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 保持最干净的触发方式，手机上直接一键运行
 
 # 解决 Node.js 20 弃用警告
 env:
@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整提交历史，以便准确读取最后一次提交信息
 
       - name: 配置 JDK 17
         uses: actions/setup-java@v4
@@ -31,16 +33,34 @@ jobs:
           # 1. 在 settings.gradle 中插入 Chaquopy 仓库地址
           sed -i '/repositories {/a \        maven { url "https://chaquo.com/maven" }' settings.gradle
           
-          # 2. 补齐 SDK 路径（这里用 > 创建并写入第一行内容）
+          # 2. 补齐 SDK 路径
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           
-          # 3. 指定 Chaquopy 的 Python 路径（必须用 >> 追加写入，防止把上一行覆盖掉）
+          # 3. 指定 Chaquopy 的 Python 路径
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
 
-          # 4. 移除签名逻辑（防止 release 模式因缺少密钥报错）
+          # 4. 移除签名逻辑
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
+
+      - name: 自动提取软件内部版本号与更新日志
+        id: get_info
+        run: |
+          # 从 app/build.gradle 中自动抓取 versionName 的值 (例如 1.8.x)
+          VERSION_NAME=$(grep "versionName" app/build.gradle | awk -F '"' '{print $2}' | head -n 1)
+          if [ -z "$VERSION_NAME" ]; then
+            # 如果是单引号包裹的形式，尝试用单引号匹配
+            VERSION_NAME=$(grep "versionName" app/build.gradle | awk -F "'" '{print $2}' | head -n 1)
+          fi
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          
+          # 自动获取你最后一次 commit 提交时写的文字作为更新日志
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          # 处理多行文本传递给 GitHub Actions 的环境变量标准写法
+          echo "COMMIT_MSG<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: 赋予执行权限
         run: chmod +x gradlew
@@ -55,20 +75,25 @@ jobs:
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
 
-      # ==================== 下面是为你新增的自动发布逻辑 ====================
-      - name: 自动创建 GitHub Release 并上传编译好的软件
+      - name: 自动创建 GitHub Release 并上传软件
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/**/release/*.apk  # 自动抓取上面刚刚生成的 release 版 APK 文件
-          tag_name: "v1.0.${{ github.run_number }}"       # 自动生成版本号，如 v1.0.1, v1.0.2 递增
-          name: "自动构建发布版本 #${{ github.run_number }}"
+          files: app/build/outputs/apk/**/release/*.apk
+          # 1. 自动使用刚刚代码里抓取出来的软件真实版本号作为标签
+          tag_name: "v${{ steps.get_info.outputs.VERSION_NAME }}-${{ github.run_number }}"
+          # 2. 标题自动显示内部版本号
+          name: "正式发布版本 v${{ steps.get_info.outputs.VERSION_NAME }} (Build #${{ github.run_number }})"
+          # 3. 更新日志自动显示你最后一次修改代码时的提交备注
           body: |
-            这是由 GitHub Actions 云端全自动编译并发布的版本，无需手动打包。
+            ## 📢 软件内部版本号：v${{ steps.get_info.outputs.VERSION_NAME }}
             
-            - **构建编号**: #${{ github.run_number }}
-            - **编译时间**: ${{ github.event.repository.updated_at }}
-            - **提交分支**: ${{ github.ref_name }}
+            ### 📝 联动代码提交更新日志：
+            ${{ steps.get_info.outputs.COMMIT_MSG }}
+            
+            ---
+            * 📂 **构建编号**: #${{ github.run_number }}
+            * ⏰ **编译分支**: `${{ github.ref_name }}`
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub 内置的安全令牌，无需手动配置
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
