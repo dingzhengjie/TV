@@ -28,38 +28,47 @@ jobs:
 
       - name: 环境预处理与代码手术
         run: |
-          # 在 settings.gradle 中插入 Chaquopy 仓库地址
+          # 1. 在 settings.gradle 中插入 Chaquopy 仓库地址
           sed -i '/repositories {/a \        maven { url "https://chaquo.com/maven" }' settings.gradle
           
-          # [span_4](start_span)原有的 Python 路径配置[span_4](end_span)
+          # 2. 补齐 SDK 路径（这里用 > 创建并写入第一行内容）
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          
+          # 3. 指定 Chaquopy 的 Python 路径（必须用 >> 追加写入，防止把上一行覆盖掉）
           PYTHON_PATH=$(which python3)
           echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
-          
-          # [span_5](start_span)补齐 SDK 路径[span_5](end_span)
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
-          # 你原有的逻辑
+          # 4. 移除签名逻辑（防止 release 模式因缺少密钥报错）
           perl -0777 -i -pe 's/signingConfigs\s*\{.*?\}\s*\}\s*//gs' app/build.gradle
           sed -i '/signingConfig/d' app/build.gradle
-
-          
-          # 2. 指定 Chaquopy 的 Python 路径[span_4](start_span)[span_4](end_span)
-          PYTHON_PATH=$(which python3)
-          echo "chaquopy.python.path=$PYTHON_PATH" >> local.properties
-          
-          # 3. 补齐 SDK 配置文件
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       - name: 赋予执行权限
         run: chmod +x gradlew
 
       - name: 生产模式构建
-        # 记得先在 build.gradle 处理签名，或使用此命令跳过正式签名（仅限测试）
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: 上传 Release APK
+      - name: 上传 Release APK（云端工件备份）
         uses: actions/upload-artifact@v4
         with:
           name: TVBox_Release_Build
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
+
+      # ==================== 下面是为你新增的自动发布逻辑 ====================
+      - name: 自动创建 GitHub Release 并上传编译好的软件
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/**/release/*.apk  # 自动抓取上面刚刚生成的 release 版 APK 文件
+          tag_name: "v1.0.${{ github.run_number }}"       # 自动生成版本号，如 v1.0.1, v1.0.2 递增
+          name: "自动构建发布版本 #${{ github.run_number }}"
+          body: |
+            这是由 GitHub Actions 云端全自动编译并发布的版本，无需手动打包。
+            
+            - **构建编号**: #${{ github.run_number }}
+            - **编译时间**: ${{ github.event.repository.updated_at }}
+            - **提交分支**: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub 内置的安全令牌，无需手动配置
