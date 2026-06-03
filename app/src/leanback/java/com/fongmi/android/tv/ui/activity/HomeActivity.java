@@ -117,17 +117,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
         initEvent();
 
-        // --- 插入开始 ---
-        boolean isBootLive = getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false);
-        if (isBootLive && isFirst) {
-            isFirst = false; 
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                if (!com.fongmi.android.tv.api.config.LiveConfig.get().getHome().isEmpty()) {
-                    com.fongmi.android.tv.ui.activity.LiveActivity.start(this);
-                }
-            }, 2500); // 延迟2.5秒，等配置加载
-        }
-        // --- 插入结束 ---
+
     }
     
 
@@ -222,7 +212,19 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         return new Callback() {
             @Override
             public void success() {
+
                 showContent();
+                // --- 插入开始 ---
+                boolean isBootLive = getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false);
+                if (isBootLive && isFirst) {
+                    isFirst = false;
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        if (!LiveConfig.get().getHome().isEmpty()) {
+                            LiveActivity.start(HomeActivity.this);
+                        }
+                    }, 2500); // 延迟2.5秒，等配置加载
+                }
+                // --- 插入结束 ---
             }
 
             @Override
