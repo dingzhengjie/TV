@@ -114,9 +114,18 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
-
         initEvent();
-
+        // --- 插入开始 ---
+        boolean isBootLive = getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false);
+        if (isBootLive && isFirst) {
+            isFirst = false;
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if (!LiveConfig.get().getHome().isEmpty()) {
+                    LiveActivity.start(HomeActivity.this);
+                }
+            }, 3000); // 延迟3秒，等配置加载
+        }
+        // --- 插入结束 ---
 
     }
     
@@ -211,21 +220,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private Callback getCallback() {
         return new Callback() {
             @Override
-            public void success() {
-
-                showContent();
-                // --- 插入开始 ---
-                boolean isBootLive = getSharedPreferences("fongmi_config", 0).getBoolean("boot_live", false);
-                if (isBootLive && isFirst) {
-                    isFirst = false;
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        if (!LiveConfig.get().getHome().isEmpty()) {
-                            LiveActivity.start(HomeActivity.this);
-                        }
-                    }, 2500); // 延迟2.5秒，等配置加载
-                }
-                // --- 插入结束 ---
-            }
+            public void success() {showContent();}
 
             @Override
             public void error(String msg) {
